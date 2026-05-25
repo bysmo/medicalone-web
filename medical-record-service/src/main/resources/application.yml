@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: medical-record-service
+  config:
+    import: "optional:configserver:http://alphacure-config:8888"
+  kafka:
+    consumer:
+      properties:
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: java.util.Map
+
+

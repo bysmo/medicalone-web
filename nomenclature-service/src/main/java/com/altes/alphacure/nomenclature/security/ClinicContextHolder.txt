@@ -1,0 +1,39 @@
+package com.altes.alphacure.nomenclature.security;
+
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.stereotype.Component;
+
+import java.util.UUID;
+
+/**
+ * Fournit le clinicId depuis le JWT (source de vérité) ou
+ * le header X-Clinic-Id injecté par le Gateway après vérification JWT.
+ */
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class ClinicContextHolder {
+
+    private final HttpServletRequest request;
+
+    public UUID getClinicId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof Jwt jwt) {
+            String clinicId = jwt.getClaimAsString("clinic_id");
+            if (clinicId != null && !clinicId.isBlank()) {
+                return UUID.fromString(clinicId);
+            }
+        }
+        String headerClinicId = request.getHeader("X-Clinic-Id");
+        if (headerClinicId != null && !headerClinicId.isBlank()) {
+            return UUID.fromString(headerClinicId);
+        }
+        throw new AccessDeniedException("Contexte clinique introuvable. Accès refusé.");
+    }
+}

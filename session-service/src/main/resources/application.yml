@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: session-service
+  config:
+    import: "optional:configserver:http://alphacure-config:8888"
+

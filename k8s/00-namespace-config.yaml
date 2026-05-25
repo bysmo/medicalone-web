@@ -1,0 +1,39 @@
+---
+# ================================================================
+# Namespace AlphaCureClinic
+# ================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: alphacure
+  labels:
+    app: alphacure-clinic
+
+---
+# ================================================================
+# ConfigMap — Variables d'environnement communes
+# ================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alphacure-config
+  namespace: alphacure
+data:
+  EUREKA_URI: "http://discovery-service:8761/eureka/"
+  KAFKA_SERVERS: "kafka-service:9092"
+  KEYCLOAK_ISSUER_URI: "http://keycloak-service:8180/realms/alphacure"
+
+---
+# ================================================================
+# Secret — Credentials sensibles
+# ================================================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alphacure-secrets
+  namespace: alphacure
+type: Opaque
+stringData:
+  DB_USERNAME: "alphacure"
+  DB_PASSWORD: "AlphaCureProd2024!"
+  KEYCLOAK_ADMIN_PASSWORD: "admin"

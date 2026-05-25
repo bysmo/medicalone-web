@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: clinic-service
+  config:
+    import: "optional:configserver:http://alphacure-config:8888"
+  codec:
+    max-in-memory-size: 20MB
+
+server:
+  tomcat:
+    max-http-post-size: 20971520
+    max-swallow-size: 20971520
+

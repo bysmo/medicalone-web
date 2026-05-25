@@ -1,0 +1,224 @@
+/* 🎨 CUSTOM KEYCLOAK LOGIN THEME - ALPHACURE CLINIC */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+
+/* 🌌 Fond d'écran global avec dégradé radial et animation de brume lumineuse */
+body {
+    background: radial-gradient(circle at 20% 30%, #1e1b4b 0%, #0f172a 70%, #020617 100%) !important;
+    font-family: 'Outfit', sans-serif !important;
+    color: #e2e8f0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 100vh !important;
+    margin: 0 !important;
+}
+
+/* 🧊 Carte de connexion en verre (Sleek Glassmorphism) */
+.login-pf-page {
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+#kc-card-wrapper {
+    background: rgba(15, 23, 42, 0.45) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 24px !important;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 
+                inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+    padding: 3rem 2.5rem !important;
+    width: 100% !important;
+    max-width: 440px !important;
+    box-sizing: border-box !important;
+    margin: 0 auto !important;
+    position: relative !important;
+}
+
+/* Bordure lumineuse décorative sur le dessus de la carte */
+#kc-card-wrapper::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 10% !important;
+    right: 10% !important;
+    height: 1.5px !important;
+    background: linear-gradient(90deg, transparent, #38bdf8, #818cf8, transparent) !important;
+}
+
+/* 🏷️ Masquer les éléments natifs superflus de Keycloak */
+#kc-header {
+    display: none !important;
+}
+
+/* 🏆 Logo & En-tête de la Clinique */
+#kc-content-wrapper {
+    margin-top: 0 !important;
+}
+
+#kc-page-title {
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 1.8rem !important;
+    font-weight: 900 !important;
+    text-transform: uppercase !important;
+    letter-spacing: -0.05em !important;
+    text-align: center !important;
+    margin-bottom: 2.2rem !important;
+    background: linear-gradient(to right, #38bdf8 20%, #818cf8 80%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.5rem !important;
+}
+
+#kc-page-title::before {
+    content: '⚡' !important;
+    font-size: 1.5rem !important;
+    filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.6)) !important;
+}
+
+/* 📝 Styles des Libellés et Formulaires */
+.form-group {
+    margin-bottom: 1.5rem !important;
+}
+
+label {
+    color: #94a3b8 !important;
+    font-size: 0.75rem !important;
+    font-weight: 700 !important;
+    margin-bottom: 0.5rem !important;
+    display: block !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important;
+}
+
+/* ⌨️ Champs de saisie */
+input[type="text"], 
+input[type="password"] {
+    background-color: rgba(15, 23, 42, 0.65) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 12px !important;
+    color: #ffffff !important;
+    font-size: 0.95rem !important;
+    padding: 0.85rem 1.1rem !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+}
+
+input[type="text"]:focus, 
+input[type="password"]:focus {
+    border-color: #38bdf8 !important;
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25),
+                inset 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    background-color: rgba(15, 23, 42, 0.8) !important;
+}
+
+/* Options supplémentaires (Se souvenir de moi / Mot de passe oublié) */
+.login-pf-settings {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    font-size: 0.8rem !important;
+    margin: 1.5rem 0 !important;
+}
+
+.checkbox label {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.4rem !important;
+    cursor: pointer !important;
+    color: #94a3b8 !important;
+    font-weight: 500 !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+}
+
+/* 🔘 Bouton Soumettre Connexion */
+#kc-login {
+    margin-top: 1.8rem !important;
+}
+
+input[type="submit"], 
+.btn-primary {
+    background: linear-gradient(135deg, #0284c7 0%, #4f46e5 100%) !important;
+    border: none !important;
+    border-radius: 12px !important;
+    color: #ffffff !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 0.95rem !important;
+    font-weight: 700 !important;
+    padding: 0.9rem !important;
+    width: 100% !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 8px 16px rgba(79, 70, 229, 0.25) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+}
+
+input[type="submit"]:hover, 
+.btn-primary:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 12px 24px rgba(79, 70, 229, 0.45) !important;
+    filter: brightness(1.1) !important;
+}
+
+input[type="submit"]:active, 
+.btn-primary:active {
+    transform: translateY(1px) !important;
+}
+
+/* 🔗 Style des liens */
+a {
+    color: #38bdf8 !important;
+    text-decoration: none !important;
+    font-weight: 600 !important;
+    transition: color 0.15s ease !important;
+}
+
+a:hover {
+    color: #818cf8 !important;
+}
+
+/* Section footer (Créer un compte / etc.) */
+#kc-info {
+    margin-top: 2rem !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+    padding-top: 1.5rem !important;
+    text-align: center !important;
+    font-size: 0.8rem !important;
+    color: #64748b !important;
+}
+
+#kc-registration {
+    font-size: 0.85rem !important;
+    color: #94a3b8 !important;
+}
+
+/* Alertes & Erreurs (Feedback visuel) */
+.alert {
+    border-radius: 12px !important;
+    padding: 0.75rem 1rem !important;
+    font-size: 0.8rem !important;
+    font-weight: 500 !important;
+    margin-bottom: 1.5rem !important;
+    border: 1px solid transparent !important;
+}
+
+.alert-error {
+    background-color: rgba(244, 63, 94, 0.15) !important;
+    border-color: rgba(244, 63, 94, 0.2) !important;
+    color: #fb7185 !important;
+}
+
+.alert-success {
+    background-color: rgba(16, 185, 129, 0.15) !important;
+    border-color: rgba(16, 185, 129, 0.2) !important;
+    color: #34d399 !important;
+}

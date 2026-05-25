@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: patient-service
+  config:
+    import: "optional:configserver:http://alphacure-config:8888"
+  cloud:
+    config:
+      fail-fast: true
+      retry:
+        initial-interval: 3000
+        max-interval: 10000
+        multiplier: 1.5
+        max-attempts: 10
+
+server:
+  port: 8081
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://discovery-service:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always

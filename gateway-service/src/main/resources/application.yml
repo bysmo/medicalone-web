@@ -1,0 +1,94 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gateway-service
+  config:
+    import: "optional:configserver:http://alphacure-config:8888"
+  codec:
+    max-in-memory-size: 20MB
+  cloud:
+    gateway:
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns:
+              - "http://localhost:*"
+              - "http://127.0.0.1:*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        - id: platform-admin-service
+          uri: lb://platform-admin-service
+          predicates:
+            - Path=/api/v1/platform-admin/**
+        - id: clinic-service
+          uri: lb://clinic-service
+          predicates:
+            - Path=/api/v1/clinics/**
+        - id: identity-service
+          uri: lb://identity-service
+          predicates:
+            - Path=/api/v1/auth/**, /api/v1/users/**, /api/v1/roles/**
+        - id: patient-service
+          uri: lb://patient-service
+          predicates:
+            - Path=/api/v1/patients/**, /api/v1/insurances/**, /api/v1/conventions/**, /api/v1/practitioners/**, /api/v1/invoices/**, /api/v1/prestations/**, /api/v1/medical-acts/**
+        - id: medical-record-service
+          uri: lb://medical-record-service
+          predicates:
+            - Path=/api/v1/medical-records/**, /api/v1/consultations/**, /api/v1/medical/**
+        - id: billing-service
+          uri: lb://billing-service
+          predicates:
+            - Path=/api/v1/pricing/**, /api/v1/cash-sessions/**
+        - id: payment-service
+          uri: lb://payment-service
+          predicates:
+            - Path=/api/v1/payments/**, /api/v1/cash-registers/**
+        - id: session-service
+          uri: lb://session-service
+          predicates:
+            - Path=/api/v1/sessions/**
+        - id: nomenclature-service
+          uri: lb://nomenclature-service
+          predicates:
+            - Path=/api/v1/nomenclatures/**
+        - id: staff-service
+          uri: lb://staff-service
+          predicates:
+            - Path=/api/v1/staff/**
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://alphacure-keycloak:8180/realms/alphacure/protocol/openid-connect/certs
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://alphacure-discovery:8761/eureka/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+
+logging:
+  level:
+    com.altes.alphacure.gateway: DEBUG

@@ -1,0 +1,9 @@
+server:
+  port: 8099
+
+spring:
+  application:
+    name: integration-test-service
+  cloud:
+    config:
+      enabled: false # On n'a pas besoin de config centrale pour ce service de test

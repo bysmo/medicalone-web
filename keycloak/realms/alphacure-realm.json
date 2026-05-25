@@ -1,0 +1,180 @@
+{
+  "id": "alphacure",
+  "realm": "alphacure",
+  "enabled": true,
+  "displayName": "AlphaCure Clinic SaaS",
+  "displayNameHtml": "<div class='kc-logo-text'><span>AlphaCure</span></div>",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "roles": {
+    "realm": [
+      {
+        "name": "SUPER_ADMIN",
+        "description": "Administrateur de la plateforme"
+      },
+      {
+        "name": "ADMIN",
+        "description": "Administrateur de la clinique"
+      },
+      {
+        "name": "MEDECIN",
+        "description": "M\u00e9decin"
+      },
+      {
+        "name": "INFIRMIER",
+        "description": "Infirmier"
+      },
+      {
+        "name": "LABORANTIN",
+        "description": "Laborantin"
+      },
+      {
+        "name": "PHARMACIEN",
+        "description": "Pharmacien"
+      },
+      {
+        "name": "RECEPTIONNISTE",
+        "description": "R\u00e9ceptionniste"
+      },
+      {
+        "name": "CAISSIER",
+        "description": "Caissier"
+      },
+      {
+        "name": "COMPTABLE",
+        "description": "Comptable"
+      },
+      {
+        "name": "MAGASINIER",
+        "description": "Magasinier"
+      },
+      {
+        "name": "MANAGER_CLINIQUE",
+        "description": "Manager de la clinique"
+      },
+      {
+        "name": "GESTIONNAIRE_ASSURANCES",
+        "description": "Gestionnaire des assurances"
+      },
+      {
+        "name": "RH",
+        "description": "Gestionnaire des ressources humaines"
+      }
+    ]
+  },
+  "groups": [],
+  "clients": [
+    {
+      "clientId": "alphacure-ui",
+      "name": "AlphaCure UI Application",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://localhost:3001/*",
+        "*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "*"
+      ],
+      "protocolMappers": [
+        {
+          "name": "clinic_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "clinic_id",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "clinic_id",
+            "jsonType.label": "String",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "access_level",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "access_level",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "access_level",
+            "jsonType.label": "String",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin_saas",
+      "enabled": true,
+      "email": "superadmin@alphacure.com",
+      "firstName": "Super",
+      "lastName": "Admin",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "SUPER_ADMIN"
+      ],
+      "clientRoles": {}
+    },
+    {
+      "username": "admin_clinic",
+      "enabled": true,
+      "email": "clinicadmin@alphacure.com",
+      "firstName": "Clinic",
+      "lastName": "Admin",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ADMIN"
+      ],
+      "attributes": {
+        "clinic_id": [
+          "4b108493-11f7-446c-bd10-3398399078bd"
+        ],
+        "access_level": [
+          "9"
+        ]
+      },
+      "clientRoles": {}
+    }
+  ],
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "id": "54848554-12c4-45c3-8cd1-f30e8793893f",
+        "providerId": "declarative-user-profile",
+        "subComponents": {},
+        "config": {
+          "kc.user.profile.config": [
+            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"email\",\"displayName\":\"${email}\",\"validations\":{\"email\":{},\"length\":{\"max\":255}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"clinic_id\",\"displayName\":\"Clinic ID\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false},{\"name\":\"access_level\",\"displayName\":\"Access Level\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes, which refer to user metadata\"}]}"
+          ]
+        }
+      }
+    ]
+  }
+}
