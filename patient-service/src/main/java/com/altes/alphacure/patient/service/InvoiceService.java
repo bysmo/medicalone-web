@@ -30,6 +30,7 @@ public class InvoiceService {
     private final InvoiceLineRepository invoiceLineRepository;
     private final com.altes.alphacure.patient.repository.PatientRepository patientRepository;
     private final ClinicClient clinicClient;
+    private final com.altes.alphacure.patient.security.ClinicContextHolder clinicContextHolder;
 
     public Invoice createInvoice(Invoice invoice, List<InvoiceLine> lines) {
         // Generate reference
@@ -82,9 +83,13 @@ public class InvoiceService {
 
         Invoice saved = invoiceRepository.save(invoice);
 
+        String username = clinicContextHolder.getUsername();
+        String creator = username != null ? username : "system";
+
         // Save lines with invoice ID
         for (InvoiceLine line : lines) {
             line.setInvoiceId(saved.getId());
+            line.setCreatedBy(creator);
             if (saved.getStatus() == InvoiceStatus.PAID) {
                 line.setStatus(com.altes.alphacure.patient.entity.enums.InvoiceLineStatus.REGLEE);
             }

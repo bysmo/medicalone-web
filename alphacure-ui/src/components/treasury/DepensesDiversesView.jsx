@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import {
   DollarSign, Landmark, CheckCircle2,
   AlertTriangle, Loader2, Receipt,
-  Edit, Trash2, Eye, Check, X, XCircle
+  Edit, Trash2, Eye, Check, X, XCircle, Printer
 } from 'lucide-react';
-import { cashSessionService, nomenclatureService } from '../../services/api';
+import { cashSessionService, nomenclatureService, clinicService } from '../../services/api';
 import DataTable from '../ui/DataTable';
 import { useClientTable } from '../../hooks/useClientTable';
 
@@ -20,6 +20,8 @@ const DepensesDiversesView = ({ showToast }) => {
   // Form & Modal states
   const [categories, setCategories] = useState([]);
   const [bankAccounts, setBankAccounts] = useState([]);
+  const [settlementAccounts, setSettlementAccounts] = useState([]);
+  const [selectedSettlementAccount, setSelectedSettlementAccount] = useState(null);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('CREATE'); // 'CREATE', 'EDIT', 'VIEW'
@@ -55,10 +57,10 @@ const DepensesDiversesView = ({ showToast }) => {
         setActiveSession(active);
 
         if (active && active.caisseCode === 'CAISSE_PRINCIPALE') {
-          // Load nomenclatures
-          const [catRes, bankRes] = await Promise.all([
+          // Load categories and profile
+          const [catRes, profileRes] = await Promise.all([
             nomenclatureService.search('CATEGORIES_DEPENSES', 'FINANCES').catch(() => ({ data: [] })),
-            nomenclatureService.search('COMPTES_BANCAIRES', 'FINANCES').catch(() => ({ data: [] }))
+            clinicService.getMyProfile().catch(() => null)
           ]);
           
           setCategories(catRes.data || []);
@@ -66,9 +68,16 @@ const DepensesDiversesView = ({ showToast }) => {
             setSelectedCategory(catRes.data[0].code);
           }
 
-          setBankAccounts(bankRes.data || []);
-          if (bankRes.data && bankRes.data.length > 0) {
-            setSelectedBankAccount(bankRes.data[0].code);
+          const profile = profileRes?.data?.profile;
+          const accounts = profile?.bankAccounts || [];
+          setSettlementAccounts(accounts);
+          setBankAccounts(accounts);
+          
+          if (accounts.length > 0) {
+            const primaryAcc = accounts.find(a => a.primary) || accounts[0];
+            setSelectedSettlementAccount(primaryAcc);
+            setSelectedBankAccount(primaryAcc.id || primaryAcc.code || '');
+            setSource(primaryAcc.type === 'ESPECES' ? 'CASH' : 'BANK');
           }
 
           // Fetch current session expenses
@@ -117,19 +126,31 @@ const DepensesDiversesView = ({ showToast }) => {
     setSelectedExpense(expense);
     setConfirmAction(null);
 
+    const eligible = settlementAccounts.filter(acc => {
+      if (acc.type === 'ESPECES') {
+        return (acc.eligibleCaisseCodes || []).includes('CAISSE_PRINCIPALE');
+      }
+      return true;
+    });
+
     if (mode === 'CREATE') {
       if (categories.length > 0) setSelectedCategory(categories[0].code);
       setAmount('');
-      setSource('CASH');
-      if (bankAccounts.length > 0) setSelectedBankAccount(bankAccounts[0].code);
-      setSelectedPaymentMethod('VIREMENT');
+      const defaultAcc = eligible.find(a => a.primary) || eligible[0] || null;
+      setSelectedSettlementAccount(defaultAcc);
       setLabel('');
     } else if (expense) {
       setSelectedCategory(expense.expenseCategory || '');
       setAmount(expense.amount ? expense.amount.toString() : '');
-      setSource(expense.paymentMethod === 'ESPECES' ? 'CASH' : 'BANK');
-      setSelectedBankAccount(expense.bankAccountCode || '');
-      setSelectedPaymentMethod(expense.paymentMethod === 'ESPECES' ? 'VIREMENT' : expense.paymentMethod);
+      
+      const matchedAcc = settlementAccounts.find(acc => {
+        if (acc.type === expense.paymentMethod) {
+          if (acc.type === 'ESPECES') return true;
+          return acc.id === expense.bankAccountCode;
+        }
+        return false;
+      });
+      setSelectedSettlementAccount(matchedAcc || null);
       
       const rawDesc = getRawDescription(expense, categories);
       setLabel(rawDesc);
@@ -141,6 +162,117 @@ const DepensesDiversesView = ({ showToast }) => {
     setIsModalOpen(false);
     setSelectedExpense(null);
     setConfirmAction(null);
+  };
+
+  const handlePrintExpenseReceipt = async (expense) => {
+    if (!expense) return;
+    showToast("Préparation de l'impression...", "info");
+    try {
+      const clinicRes = await clinicService.getMyProfile().catch(() => null);
+      const clinic = clinicRes?.data?.clinic;
+      const clinicProfile = clinicRes?.data?.profile;
+      const accounts = clinicProfile?.bankAccounts || [];
+      const selectedAccount = accounts.find(a => a.id === expense.bankAccountCode);
+
+      let paymentInfoHtml = '';
+      if (selectedAccount) {
+        if (selectedAccount.type === 'MOBILE_MONEY') {
+          paymentInfoHtml = `<span>Mobile Money (${selectedAccount.providerName} - ${selectedAccount.phoneNumber})</span>`;
+        } else if (selectedAccount.type === 'VIREMENT_BANCAIRE') {
+          paymentInfoHtml = `<span>Virement Bancaire (${selectedAccount.bankName} - N°: ${selectedAccount.accountNumber})</span>`;
+        } else if (selectedAccount.type === 'ESPECES') {
+          paymentInfoHtml = `<span>Espèces (Caisse : ${activeSession?.caisseCode || 'Caisse'})</span>`;
+        }
+      } else {
+        paymentInfoHtml = `<span>${expense.paymentMethod === 'ESPECES' ? 'Espèces' : expense.paymentMethod}</span>`;
+      }
+
+      const headerImg = clinicProfile?.printHeaderA4 || clinicProfile?.printHeaderA5 || '';
+      const footerImg = clinicProfile?.printFooterA4 || clinicProfile?.printFooterA5 || '';
+
+      const printWindow = window.open('', '', 'width=800,height=900,toolbar=0,scrollbars=0,status=0');
+      if (!printWindow) {
+        showToast("Le bloqueur de fenêtres contextuelles bloque l'impression. Veuillez l'autoriser.", "warning");
+        return;
+      }
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Bon de Dépense - \${expense.id.substring(0, 8)}</title>
+            <style>
+              body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; line-height: 1.5; padding: 30px; font-size: 13px; }
+              .header-img { width: 100%; max-height: 120px; object-fit: contain; margin-bottom: 20px; }
+              .title { text-align: center; font-size: 18px; font-weight: bold; margin-top: 10px; margin-bottom: 25px; text-transform: uppercase; color: #be123c; border-bottom: 2px solid #be123c; padding-bottom: 8px; }
+              .details-table { width: 100%; margin-bottom: 25px; border-collapse: collapse; }
+              .details-table td { padding: 8px 12px; border: 1px solid #e2e8f0; }
+              .details-table td.label { font-weight: bold; width: 35%; background-color: #f8fafc; color: #475569; }
+              .bold { font-weight: bold; }
+              .font-mono { font-family: monospace; }
+              .footer-signature { margin-top: 50px; border-top: 1px dashed #cbd5e1; padding-top: 20px; }
+            </style>
+          </head>
+          <body>
+            \${headerImg ? '<img class="header-img" src="' + headerImg + '" alt="Header" />' : '<div style="text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 20px;">' + (clinic?.name || 'CLINIQUE') + '</div>'}
+            
+            <div class="title">Bon de Dépense Diverses</div>
+
+            <table class="details-table">
+              <tr>
+                <td class="label">Date / Heure :</td>
+                <td>\${new Date(expense.createdAt).toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td class="label">Objet / Descriptif :</td>
+                <td class="bold">\${expense.label}</td>
+              </tr>
+              <tr>
+                <td class="label">Mode de règlement :</td>
+                <td>\${paymentInfoHtml}</td>
+              </tr>
+              <tr>
+                <td class="label">Montant :</td>
+                <td class="bold" style="color: #dc2626; font-size: 15px;">\${formatCurrency(expense.amount)} FCFA</td>
+              </tr>
+              <tr>
+                <td class="label">Session Trésorerie :</td>
+                <td class="font-mono">\${activeSession?.sessionRef || 'Session'}</td>
+              </tr>
+            </table>
+
+            <div class="footer-signature">
+              <table style="width: 100%;">
+                <tr>
+                  <td>
+                    <strong>Le Caissier / Agent :</strong><br/>
+                    \${activeSession?.cashierUsername || 'Caisse'}<br/><br/>
+                    Signature : ______________________
+                  </td>
+                  <td style="text-align: right; vertical-align: top;">
+                    <strong>Bénéficiaire / Destinataire :</strong><br/><br/>
+                    Signature : ______________________
+                  </td>
+                </tr>
+              </table>
+            </div>
+
+            \${footerImg ? '<div style="text-align: center; margin-top: 50px;"><img class="footer-img" src="' + footerImg + '" alt="Footer" /></div>' : ''}
+
+            <script>
+              window.onload = function() {
+                window.focus();
+                window.print();
+                window.close();
+              }
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } catch (err) {
+      console.error("Error generating printout", err);
+      showToast("Erreur lors de l'impression.", "error");
+    }
   };
 
   const handleFormSubmit = async (e) => {
@@ -161,12 +293,15 @@ const DepensesDiversesView = ({ showToast }) => {
 
     setSaving(true);
     try {
+      const pm = selectedSettlementAccount ? selectedSettlementAccount.type : 'ESPECES';
+      const bac = selectedSettlementAccount && selectedSettlementAccount.type !== 'ESPECES' ? selectedSettlementAccount.id : null;
+
       const payload = {
         type: 'DECAISSEMENT',
         amount: parseFloat(amount),
         label: `Dépense [${categoryName}] - ${label}`,
-        paymentMethod: source === 'CASH' ? 'ESPECES' : selectedPaymentMethod,
-        bankAccountCode: source === 'BANK' ? selectedBankAccount : null,
+        paymentMethod: pm,
+        bankAccountCode: bac,
         expenseCategory: selectedCategory
       };
 
@@ -264,6 +399,28 @@ const DepensesDiversesView = ({ showToast }) => {
       label: 'Source Règlement',
       key: 'paymentMethod',
       render: (row) => {
+        const matched = settlementAccounts.find(a => {
+          if (a.type === row.paymentMethod) {
+            if (a.type === 'ESPECES') return true;
+            return a.id === row.bankAccountCode;
+          }
+          return false;
+        });
+        if (matched) {
+          if (matched.type === 'ESPECES') {
+            return (
+              <span className="flex items-center gap-1 text-[10px] font-black text-amber-700 uppercase">
+                <DollarSign size={12} /> {matched.name}
+              </span>
+            );
+          } else {
+            return (
+              <span className="flex items-center gap-1 text-[10px] font-black text-sky-700 uppercase">
+                <Landmark size={12} /> {matched.name}
+              </span>
+            );
+          }
+        }
         if (row.paymentMethod === 'ESPECES') {
           return (
             <span className="flex items-center gap-1 text-[10px] font-black text-amber-700 uppercase">
@@ -389,6 +546,13 @@ const DepensesDiversesView = ({ showToast }) => {
                   className="bg-slate-50 hover:bg-slate-100 text-slate-600 p-1.5 rounded-lg border border-slate-200 transition-all flex items-center justify-center"
                 >
                   <Eye size={13} />
+                </button>
+                <button
+                  onClick={() => handlePrintExpenseReceipt(row)}
+                  title="Imprimer le bon de dépense"
+                  className="bg-slate-50 hover:bg-slate-100 text-slate-700 p-1.5 rounded-lg border border-slate-200 transition-all flex items-center justify-center"
+                >
+                  <Printer size={13} />
                 </button>
                 {row.status === 'PENDING' && (
                   <>
@@ -559,84 +723,48 @@ const DepensesDiversesView = ({ showToast }) => {
                     />
                   </div>
 
-                  {/* Source selection */}
+                  {/* Compte de Règlement selection */}
                   <div>
-                    <label className="text-[10px] text-slate-400 uppercase tracking-wider block mb-2">
-                      Source de Financement
+                    <label className="text-[10px] text-slate-400 uppercase tracking-wider block mb-1.5">
+                      Compte de Règlement
                     </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => !disabled && setSource('CASH')}
-                        disabled={disabled}
-                        className={`p-2.5 rounded-lg border text-[10px] font-black uppercase tracking-wider text-center transition-all ${
-                          source === 'CASH'
-                            ? 'border-rose-500 bg-rose-50 text-rose-700'
-                            : 'border-slate-200 text-slate-500 hover:bg-slate-50 disabled:hover:bg-transparent'
-                        } disabled:opacity-75`}
-                      >
-                        Espèces (Caisse)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => !disabled && setSource('BANK')}
-                        disabled={disabled}
-                        className={`p-2.5 rounded-lg border text-[10px] font-black uppercase tracking-wider text-center transition-all ${
-                          source === 'BANK'
-                            ? 'border-rose-500 bg-rose-50 text-rose-700'
-                            : 'border-slate-200 text-slate-500 hover:bg-slate-50 disabled:hover:bg-transparent'
-                        } disabled:opacity-75`}
-                      >
-                        Compte Bancaire
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Bank Details section */}
-                  {source === 'BANK' && (
-                    <div className="space-y-3 bg-slate-50 border border-slate-200/50 rounded-xl p-3.5 animate-in fade-in slide-in-from-top-2 duration-200">
-                      <div>
-                        <label className="text-[9px] text-slate-500 uppercase tracking-wider block mb-1">
-                          Sélectionner le Compte
-                        </label>
-                        <select
-                          value={selectedBankAccount}
-                          onChange={e => setSelectedBankAccount(e.target.value)}
-                          disabled={disabled}
-                          className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 outline-none focus:border-rose-500 disabled:opacity-75"
-                          required
-                        >
-                          {bankAccounts.map(bank => (
-                            <option key={bank.code} value={bank.code}>
-                              {bank.string1}
+                    <select
+                      value={selectedSettlementAccount?.id || ''}
+                      onChange={e => {
+                        const acc = settlementAccounts.find(a => a.id === e.target.value);
+                        setSelectedSettlementAccount(acc || null);
+                      }}
+                      disabled={disabled}
+                      className="w-full border border-slate-200 rounded-lg p-3 bg-slate-50 outline-none focus:border-rose-500 text-slate-800 disabled:opacity-75 disabled:cursor-not-allowed"
+                      required
+                    >
+                      {settlementAccounts
+                        .filter(acc => {
+                          if (acc.type === 'ESPECES') {
+                            return (acc.eligibleCaisseCodes || []).includes('CAISSE_PRINCIPALE');
+                          }
+                          return true;
+                        })
+                        .map(acc => {
+                          let labelStr = acc.name;
+                          if (acc.type === 'ESPECES') {
+                            labelStr = `${acc.name} (Espèces)`;
+                          } else if (acc.type === 'MOBILE_MONEY') {
+                            labelStr = `${acc.name} (${acc.providerName} - ${acc.phoneNumber})`;
+                          } else if (acc.type === 'VIREMENT_BANCAIRE') {
+                            labelStr = `${acc.name} (${acc.bankName} - ${acc.accountNumber})`;
+                          }
+                          return (
+                            <option key={acc.id} value={acc.id}>
+                              {labelStr}
                             </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[9px] text-slate-500 uppercase tracking-wider block mb-1.5">
-                          Mode de Règlement Bancaire
-                        </label>
-                        <div className="flex gap-2">
-                          {['VIREMENT', 'CHEQUE', 'CARTE_BANCAIRE'].map(method => (
-                            <button
-                              key={method}
-                              type="button"
-                              onClick={() => !disabled && setSelectedPaymentMethod(method)}
-                              disabled={disabled}
-                              className={`flex-1 p-2 rounded-lg border text-[9px] font-black uppercase tracking-widest text-center transition-all ${
-                                selectedPaymentMethod === method
-                                  ? 'border-slate-800 bg-slate-900 text-white'
-                                  : 'border-slate-300 bg-white text-slate-500 hover:bg-slate-50 disabled:hover:bg-white'
-                              } disabled:opacity-75`}
-                            >
-                              {method === 'CARTE_BANCAIRE' ? 'Carte' : method === 'CHEQUE' ? 'Chèque' : 'Vire.'}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                          );
+                        })}
+                      {settlementAccounts.length === 0 && (
+                        <option value="">Aucun compte de règlement configuré</option>
+                      )}
+                    </select>
+                  </div>
 
                   {/* Description input */}
                   <div>

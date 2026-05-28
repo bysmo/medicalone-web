@@ -117,7 +117,7 @@ public class ClinicController {
     }
 
     @PutMapping("/me")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER_CLINIQUE')")
     @Operation(summary = "Mettre à jour le profil de ma clinique")
     public ResponseEntity<ClinicFullResponse> updateMyClinic(@RequestBody ClinicProfileUpdateRequest request) {
         UUID clinicId = ClinicSecurityContext.getClinicId();

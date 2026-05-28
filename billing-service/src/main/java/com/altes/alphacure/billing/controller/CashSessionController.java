@@ -46,6 +46,45 @@ public class CashSessionController {
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("active", false)));
     }
 
+    @GetMapping("/stats")
+    @PreAuthorize("hasAnyRole('ADMIN', 'COMPTABLE', 'MANAGER_CLINIQUE', 'RH')")
+    @Operation(summary = "Obtenir les statistiques mensuelles de caisse pour un caissier")
+    public ResponseEntity<?> getCashierStats(
+            @RequestParam String cashierUsername,
+            @RequestParam String month) {
+        
+        java.time.LocalDate start = java.time.LocalDate.parse(month + "-01");
+        LocalDateTime startDateTime = start.atStartOfDay();
+        LocalDateTime endDateTime = start.plusMonths(1).atStartOfDay();
+        
+        List<CashSession> sessions = cashSessionRepository.findSessionsForStats(cashierUsername, startDateTime, endDateTime);
+        
+        long count = sessions.size();
+        BigDecimal totalEcarts = sessions.stream()
+                .map(s -> s.getDiscrepancy() != null ? s.getDiscrepancy() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                
+        BigDecimal totalEncaisse = BigDecimal.ZERO;
+        BigDecimal totalDecaisse = BigDecimal.ZERO;
+        
+        if (count > 0) {
+            List<UUID> sessionIds = sessions.stream().map(CashSession::getId).toList();
+            
+            BigDecimal enc = cashTransactionRepository.sumTransactionAmountBySessionsAndType(sessionIds, "ENCAISSEMENT");
+            totalEncaisse = enc != null ? enc : BigDecimal.ZERO;
+            
+            BigDecimal dec = cashTransactionRepository.sumTransactionAmountBySessionsAndType(sessionIds, "DECAISSEMENT");
+            totalDecaisse = dec != null ? dec : BigDecimal.ZERO;
+        }
+        
+        return ResponseEntity.ok(Map.of(
+                "sessionCount", count,
+                "totalEncaisse", totalEncaisse,
+                "totalDecaisse", totalDecaisse,
+                "totalEcarts", totalEcarts
+        ));
+    }
+
     @PostMapping("/open")
     @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONNISTE', 'CAISSIER', 'MANAGER_CLINIQUE')")
     @Operation(summary = "Ouvrir une nouvelle session de caisse")
@@ -187,8 +226,32 @@ public class CashSessionController {
         UUID clinicId = clinicContextHolder.getClinicId();
         String username = clinicContextHolder.getUsername();
 
-        CashSession activeSession = cashSessionRepository.findByCashierUsernameAndStatus(username, "OPEN")
-                .orElseThrow(() -> new IllegalStateException("Aucune session de caisse ouverte."));
+        String caisseCode = (String) body.get("caisseCode");
+        CashSession activeSession;
+        if (caisseCode != null && !caisseCode.isBlank()) {
+            java.util.Optional<CashSession> openSessionOpt = cashSessionRepository.findFirstByCaisseCodeAndStatus(caisseCode, "OPEN");
+            if (openSessionOpt.isPresent()) {
+                activeSession = openSessionOpt.get();
+            } else {
+                List<CashSession> allSessions = cashSessionRepository.findByClinicIdOrderByOpeningDateDesc(clinicId);
+                activeSession = allSessions.stream()
+                        .filter(s -> caisseCode.equals(s.getCaisseCode()))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException("Aucune session de caisse ouverte ni historique trouvé pour la caisse: " + caisseCode));
+            }
+        } else {
+            java.util.Optional<CashSession> openOpt = cashSessionRepository.findByCashierUsernameAndStatus(username, "OPEN");
+            if (openOpt.isPresent()) {
+                activeSession = openOpt.get();
+            } else {
+                List<CashSession> allSessions = cashSessionRepository.findByClinicIdOrderByOpeningDateDesc(clinicId);
+                if (!allSessions.isEmpty()) {
+                    activeSession = allSessions.get(0);
+                } else {
+                    throw new IllegalStateException("Aucune session de caisse ouverte ou archivée pour cette clinique.");
+                }
+            }
+        }
 
         String type = (String) body.get("type"); // ENCAISSEMENT, DECAISSEMENT
         if (type == null || (!"ENCAISSEMENT".equals(type) && !"DECAISSEMENT".equals(type))) {
@@ -365,7 +428,17 @@ public class CashSessionController {
                     continue;
                 }
                 BigDecimal amount = t.getAmount();
-                if ("DECAISSEMENT".equals(t.getType())) {
+                
+                boolean isDebit;
+                if ("TRANSFERT_BANQUE".equals(t.getExpenseCategory())) {
+                    isDebit = false;
+                } else if ("APPROVISIONNEMENT_BANQUE".equals(t.getExpenseCategory())) {
+                    isDebit = true;
+                } else {
+                    isDebit = "DECAISSEMENT".equals(t.getType());
+                }
+                
+                if (isDebit) {
                     amount = amount.negate();
                 }
                 bankBalances.put(t.getBankAccountCode(), bankBalances.getOrDefault(t.getBankAccountCode(), BigDecimal.ZERO).add(amount));
@@ -473,7 +546,17 @@ public class CashSessionController {
                 .orElseThrow(() -> new IllegalStateException("Session associée introuvable"));
 
         if (!"OPEN".equals(session.getStatus())) {
-            return ResponseEntity.badRequest().body(Map.of("message", "La session de caisse associée est clôturée."));
+            if ("VIREMENT".equalsIgnoreCase(tx.getPaymentMethod())) {
+                // Bank transfers don't affect cash drawer balance, we can validate directly
+            } else {
+                java.util.Optional<CashSession> openSessionOpt = cashSessionRepository.findFirstByCaisseCodeAndStatus(session.getCaisseCode(), "OPEN");
+                if (openSessionOpt.isPresent()) {
+                    session = openSessionOpt.get();
+                    tx.setSessionId(session.getId());
+                } else {
+                    return ResponseEntity.badRequest().body(Map.of("message", "La session de caisse associée est clôturée et aucune nouvelle session n'est ouverte pour la caisse: " + session.getCaisseCode()));
+                }
+            }
         }
 
         // Validate that disbursement doesn't exceed current machine balance
@@ -490,5 +573,31 @@ public class CashSessionController {
         updateSessionExpectedAmount(session);
 
         return ResponseEntity.ok(saved);
+    }
+
+    @GetMapping("/transactions")
+    @PreAuthorize("hasAnyRole('ADMIN', 'COMPTABLE', 'MANAGER_CLINIQUE')")
+    @Operation(summary = "Lister toutes les transactions de la clinique, avec filtre optionnel")
+    public ResponseEntity<List<CashTransaction>> getAllClinicTransactions(
+            @RequestParam(required = false) String bankAccountCode,
+            @RequestParam(required = false) String status) {
+        UUID clinicId = clinicContextHolder.getClinicId();
+        List<CashTransaction> txs = cashTransactionRepository.findByClinicId(clinicId);
+
+        java.util.stream.Stream<CashTransaction> stream = txs.stream();
+
+        if (bankAccountCode != null && !bankAccountCode.isBlank()) {
+            stream = stream.filter(t -> bankAccountCode.equals(t.getBankAccountCode()));
+        }
+
+        if (status != null && !status.isBlank()) {
+            stream = stream.filter(t -> status.equalsIgnoreCase(t.getStatus()));
+        }
+
+        List<CashTransaction> result = stream
+                .sorted(java.util.Comparator.comparing(CashTransaction::getCreatedAt).reversed())
+                .collect(java.util.stream.Collectors.toList());
+
+        return ResponseEntity.ok(result);
     }
 }

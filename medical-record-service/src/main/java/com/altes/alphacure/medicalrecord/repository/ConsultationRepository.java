@@ -34,4 +34,6 @@ public interface ConsultationRepository extends JpaRepository<Consultation, UUID
             UUID clinicId, UUID practitionerId, LocalDateTime after);
 
     List<Consultation> findByClinicIdAndNature(UUID clinicId, String nature);
+
+    List<Consultation> findByClinicId(UUID clinicId);
 }

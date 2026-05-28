@@ -16,7 +16,7 @@ const SuiviSeancesView = ({ showToast }) => {
   const [controlDelay, setControlDelay] = useState(15); // Default 15 days
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   // Modal for Scheduling / Practitioner Selection
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -97,7 +97,7 @@ const SuiviSeancesView = ({ showToast }) => {
         const matchedPatient = line.patientId ? patientsMap[line.patientId] : null;
         const patientConsultations = historiesMap[line.patientId] || [];
         const matchedAct = (actsRes?.data || []).find(act => act.id === line.actId);
-        
+
         // Count consultations linked to this prestation
         const realizedConsultations = patientConsultations.filter(c => c.prestationId === line.id);
         const realized = realizedConsultations.length;
@@ -125,10 +125,10 @@ const SuiviSeancesView = ({ showToast }) => {
       const mappedControles = parentConsultationLines.map(line => {
         const matchedPatient = line.patientId ? patientsMap[line.patientId] : null;
         const patientConsultations = historiesMap[line.patientId] || [];
-        
+
         // Find consultations linked to this prestation
         const linkedConsultations = patientConsultations.filter(c => c.prestationId === line.id);
-        
+
         // Calculate age of the paid invoice in days
         const paymentDate = new Date(line.createdAt);
         const today = new Date();
@@ -182,7 +182,7 @@ const SuiviSeancesView = ({ showToast }) => {
     setScheduling(true);
     try {
       const isSeance = activeTab === 'seances';
-      
+
       const payload = {
         prestationId: selectedItem.id,
         patientId: selectedItem.patientId,
@@ -194,7 +194,7 @@ const SuiviSeancesView = ({ showToast }) => {
 
       await medicalService.createConsultation(payload);
       showToast(
-        isSeance 
+        isSeance
           ? "Séance programmée et ajoutée à la file d'attente du praticien avec succès !"
           : "Consultation de contrôle programmée et ajoutée à la file d'attente avec succès !",
         "success"
@@ -232,26 +232,24 @@ const SuiviSeancesView = ({ showToast }) => {
       {/* Page Title */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-3">
-          <HeartPulse size={28} className="text-sky-600 animate-pulse" /> Suivi & Programmation Médicale
+          <HeartPulse size={28} className="text-sky-600 animate-pulse" /> Suivi des séances et des contrôles
         </h2>
-        
+
         {/* Tab Bar */}
         <div className="flex bg-slate-200/80 p-1 rounded-xl border border-slate-300/40">
           <button
             onClick={() => { setActiveTab('seances'); setSearchTerm(''); }}
-            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
-              activeTab === 'seances' ? 'bg-sky-600 text-white shadow-lg' : 'text-slate-600 hover:text-slate-900'
-            }`}
+            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === 'seances' ? 'bg-sky-600 text-white shadow-lg' : 'text-slate-600 hover:text-slate-900'
+              }`}
           >
-            Séances & Forfaits
+            Séances de thérapie
           </button>
           <button
             onClick={() => { setActiveTab('controles'); setSearchTerm(''); }}
-            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
-              activeTab === 'controles' ? 'bg-sky-600 text-white shadow-lg' : 'text-slate-600 hover:text-slate-900'
-            }`}
+            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === 'controles' ? 'bg-sky-600 text-white shadow-lg' : 'text-slate-600 hover:text-slate-900'
+              }`}
           >
-            Contrôles & Consultations
+            Contrôles après consultation
           </button>
         </div>
       </div>
@@ -465,7 +463,7 @@ const SuiviSeancesView = ({ showToast }) => {
               </h3>
               <button onClick={() => setModalOpen(false)} className="text-white/60 hover:text-white font-bold">×</button>
             </div>
-            
+
             <div className="p-6 space-y-4">
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-sm">
                 <div className="font-bold text-slate-800">{selectedItem.actName}</div>

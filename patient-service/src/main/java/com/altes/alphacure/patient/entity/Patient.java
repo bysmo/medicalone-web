@@ -92,6 +92,9 @@ public class Patient {
     @Builder.Default
     private java.math.BigDecimal montantTotalARembourser = java.math.BigDecimal.ZERO;
     
+    @Column(name = "created_by", length = 100)
+    private String createdBy;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

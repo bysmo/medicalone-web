@@ -41,7 +41,9 @@ const parseStaffSpecialty = (specStr) => {
     gender: parts[7] || 'M',
     address: parts[8] || '',
     cnib: parts[9] || '',
-    studyLevel: parts[10] || 'Bac'
+    studyLevel: parts[10] || 'Bac',
+    paymentMethod: parts[11] || 'ESPECES',
+    paymentDetails: parts[12] || ''
   };
 
   if (type === 'MEDECIN') {
@@ -58,7 +60,7 @@ const parseStaffSpecialty = (specStr) => {
 };
 
 const serializeStaffSpecialty = (data) => {
-  const personalStr = `${data.lastName || ''}|${data.firstName || ''}|${data.dob || ''}|${data.gender || 'M'}|${data.address || ''}|${data.cnib || ''}|${data.studyLevel || 'Bac'}`;
+  const personalStr = `${data.lastName || ''}|${data.firstName || ''}|${data.dob || ''}|${data.gender || 'M'}|${data.address || ''}|${data.cnib || ''}|${data.studyLevel || 'Bac'}|${data.paymentMethod || 'ESPECES'}|${data.paymentDetails || ''}`;
 
   if (data.type === 'MEDECIN') {
     return `MEDECIN|${data.specialty}|${data.contractType}|${data.value}|${personalStr}`;
@@ -115,6 +117,8 @@ const StaffManagement = ({ showToast }) => {
   const [formContractType, setFormContractType] = useState('permanent');
   const [formVal, setFormVal] = useState('500000'); // salary or comm
   const [formAccounts, setFormAccounts] = useState([]);
+  const [formPaymentMethod, setFormPaymentMethod] = useState('ESPECES');
+  const [formPaymentDetails, setFormPaymentDetails] = useState('');
 
   // Access Management states
   const [showAccessModal, setShowAccessModal] = useState(null);
@@ -314,6 +318,8 @@ const StaffManagement = ({ showToast }) => {
     setFormContractType('permanent');
     setFormVal('500000');
     setFormAccounts([]);
+    setFormPaymentMethod('ESPECES');
+    setFormPaymentDetails('');
     setShowForm(true);
   };
 
@@ -335,6 +341,8 @@ const StaffManagement = ({ showToast }) => {
 
     setFormContractType(parsed.contractType || 'permanent');
     setFormVal(parsed.value || '500000');
+    setFormPaymentMethod(parsed.paymentMethod || 'ESPECES');
+    setFormPaymentDetails(parsed.paymentDetails || '');
 
     if (parsed.type === 'MEDECIN') {
       setFormSpecialty(parsed.specialty);
@@ -369,7 +377,9 @@ const StaffManagement = ({ showToast }) => {
       gender: formGender,
       address: formAddress,
       cnib: formCnib,
-      studyLevel: formStudyLevel
+      studyLevel: formStudyLevel,
+      paymentMethod: formPaymentMethod,
+      paymentDetails: formPaymentDetails
     });
 
     const formData = {
@@ -683,6 +693,20 @@ const StaffManagement = ({ showToast }) => {
                       <span>{parsed.value || 0}% de commission</span>
                     </div>
                   )}
+                </div>
+              );
+            }
+          },
+          {
+            label: "Règlement",
+            key: "payment",
+            render: (row) => {
+              const parsed = parseStaffSpecialty(row.specialty);
+              const method = parsed.paymentMethod || 'ESPECES';
+              return (
+                <div className="text-[10px] font-bold text-slate-700">
+                  <div className="uppercase font-black text-slate-800">{method === 'ESPECES' ? 'Espèces' : method === 'VIREMENT' ? 'Virement' : 'Mobile Money'}</div>
+                  {parsed.paymentDetails && <div className="text-[9px] text-slate-400 font-mono mt-0.5">{parsed.paymentDetails}</div>}
                 </div>
               );
             }
@@ -1027,6 +1051,38 @@ const StaffManagement = ({ showToast }) => {
                           </>
                         )}
                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-200/60">
+                      <div>
+                        <label className="text-[9px] text-slate-500 font-bold uppercase block mb-1 font-black">Moyen de règlement *</label>
+                        <select
+                          value={formPaymentMethod}
+                          onChange={e => {
+                            setFormPaymentMethod(e.target.value);
+                            setFormPaymentDetails('');
+                          }}
+                          className="w-full border border-slate-200 rounded bg-white p-2 text-xs outline-none focus:border-sky-500 font-semibold"
+                        >
+                          <option value="ESPECES">Espèces</option>
+                          <option value="VIREMENT">Virement bancaire</option>
+                          <option value="MOBILE_MONEY">Mobile Money</option>
+                        </select>
+                      </div>
+
+                      {formPaymentMethod !== 'ESPECES' && (
+                        <div>
+                          <label className="text-[9px] text-slate-500 font-bold uppercase block mb-1 font-black">
+                            {formPaymentMethod === 'VIREMENT' ? 'RIB complet *' : 'Numéro de téléphone *'}
+                          </label>
+                          <input
+                            value={formPaymentDetails}
+                            onChange={e => setFormPaymentDetails(e.target.value)}
+                            placeholder={formPaymentMethod === 'VIREMENT' ? 'Ex: BF001 01001 012345678901 02' : 'Ex: 70 00 11 22'}
+                            className="w-full border border-slate-200 rounded bg-white p-2 text-xs outline-none focus:border-sky-500 font-bold"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

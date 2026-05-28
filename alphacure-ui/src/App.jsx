@@ -18,6 +18,7 @@ import PrestationsView from './components/prestations/PrestationList';
 import ActsManagement from './components/settings/ActsManagement';
 import ActTariffsManagement from './components/settings/ActTariffsManagement';
 import StaffManagement from './components/settings/StaffManagement';
+import RemunerationCalculView from './components/hr/RemunerationCalculView';
 import InsuranceConventions from './components/settings/InsuranceConventions';
 import NomenclatureManagement from './components/settings/NomenclatureManagement';
 import InsurersManagement from './components/settings/InsurersManagement';
@@ -30,6 +31,7 @@ import AuditCaissesView from './components/treasury/AuditCaissesView';
 import DepensesDiversesView from './components/treasury/DepensesDiversesView';
 import EtatsPeriodiquesView from './components/treasury/EtatsPeriodiquesView';
 import FacturesAssuranceView from './components/treasury/FacturesAssuranceView';
+import ComptesBancairesView from './components/treasury/ComptesBancairesView';
 import { hasRole, getUserProfile, logout, isMissingClinicContext } from './services/auth';
 import ClinicRegistration from './components/public/ClinicRegistration';
 import PlatformAdminDashboard from './components/admin/PlatformAdminDashboard';
@@ -40,6 +42,87 @@ import HistoriquePrestationsView from './components/medical/HistoriquePrestation
 import DossiersMedicauxListView from './components/medical/DossiersMedicauxListView';
 import ImagerieConsultationView from './components/medical/ImagerieConsultationView';
 import { Shield } from 'lucide-react';
+
+const formatBirthDate = (dateStr) => {
+  if (!dateStr) return '—';
+  const parts = dateStr.split('-');
+  if (parts.length === 3 && parts[0].length === 4) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  } catch {
+    return dateStr;
+  }
+};
+
+const computeAgeAndTranche = (birthDateStr) => {
+  if (!birthDateStr) return null;
+  try {
+    const today = new Date();
+    const birth = new Date(birthDateStr);
+    if (isNaN(birth.getTime())) return null;
+
+    let years = today.getFullYear() - birth.getFullYear();
+    let months = today.getMonth() - birth.getMonth();
+    let days = today.getDate() - birth.getDate();
+
+    if (days < 0) {
+      months -= 1;
+    }
+    if (months < 0) {
+      years -= 1;
+      months += 12;
+    }
+
+    const totalMonths = (years * 12) + months;
+
+    let tranche = '';
+    let ageLabel = '';
+    let badgeClass = '';
+
+    if (totalMonths < 3) {
+      tranche = 'NOUVEAUX-NES';
+      if (totalMonths === 0) {
+        const diffTime = today - birth;
+        const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+        ageLabel = `${diffDays} j`;
+      } else {
+        ageLabel = `${totalMonths} mois`;
+      }
+      badgeClass = 'bg-purple-100 text-purple-700 border border-purple-200';
+    } else if (totalMonths < 12) {
+      tranche = 'NOURRISSONS';
+      ageLabel = `${totalMonths} mois`;
+      badgeClass = 'bg-pink-100 text-pink-700 border border-pink-200';
+    } else if (years < 15) {
+      tranche = 'ENFANTS';
+      ageLabel = `${years} ans`;
+      badgeClass = 'bg-teal-100 text-teal-700 border border-teal-200';
+    } else if (years < 25) {
+      tranche = 'JEUNES';
+      ageLabel = `${years} ans`;
+      badgeClass = 'bg-sky-100 text-sky-700 border border-sky-200';
+    } else if (years < 60) {
+      tranche = 'ADULTES';
+      ageLabel = `${years} ans`;
+      badgeClass = 'bg-slate-100 text-slate-700 border border-slate-200';
+    } else {
+      tranche = 'SENIORS';
+      ageLabel = `${years} ans`;
+      badgeClass = 'bg-amber-100 text-amber-700 border border-amber-200';
+    }
+
+    return { ageLabel, tranche, badgeClass };
+  } catch {
+    return null;
+  }
+};
 
 // --- Composant Principal App ---
 
@@ -117,8 +200,8 @@ const AppShell = ({ isPublic }) => {
   const [patientForBilling, setPatientForBilling] = useState(null);
 
   // Dynamic Lists
-  const [insurers, setInsurers] = useState(['SONAR', 'UAB', 'SUNU', 'ALLIANZ']);
-  const [subscribers, setSubscribers] = useState(['SONABEL', 'ONEA', 'CFAOT', 'INDIVIDUEL']);
+  const [insurers, setInsurers] = useState(['SONAR', 'UAB', 'SUNU', 'ALLIANZ', 'MCI', 'GA']);
+  const [subscribers, setSubscribers] = useState(['SONABEL', 'ONEA', 'CFAO', 'ORANGE', 'CORIS BANK', 'ECOBANK', 'BOA', 'VISTA BANK']);
 
   const loadDynamicInsurersAndSubscribers = async () => {
     try {
@@ -201,8 +284,8 @@ const AppShell = ({ isPublic }) => {
       id: 'accueil', icon: Users, label: 'Accueil patients', subs: [
         { id: 'patients-list', label: 'Dossiers patients' },
         { id: 'prestations-patients', label: 'Prestations patients' },
-        { id: 'suivi-seances', label: 'Suivi des séances' },
-        { id: 'annulations', label: 'Annulations' }
+        { id: 'suivi-seances', label: 'Séances et contrôles' },
+        //{ id: 'annulations', label: 'Annulations' }
       ]
     },
     !hasRole('SUPER_ADMIN') && {
@@ -213,16 +296,17 @@ const AppShell = ({ isPublic }) => {
         { id: 'remboursements', label: 'Remboursements' },
         { id: 'depenses-diverses', label: 'Dépenses diverses' },
         { id: 'audit-caisses', label: 'Audit des caisses' },
+        { id: 'comptes-bancaires', label: 'Comptes de règlement' },
         { id: 'factures-assurance', label: 'Factures assurance' },
         { id: 'remuneration-personnel', label: 'Rémunération du personnel' },
-        { id: 'statistiques-activite', label: 'Statistiques activité' },
+        //{ id: 'statistiques-activite', label: 'Statistiques activité' },
         { id: 'etats-periodiques', label: 'Etats périodiques' },
       ]
     },
 
     !hasRole('SUPER_ADMIN') && {
       id: 'prestations-medicales', icon: Stethoscope, label: 'Prestations médicales', subs: [
-        { id: 'agenda-medecin', label: 'Mon agenda' },
+        //{ id: 'agenda-medecin', label: 'Mon agenda' },
         { id: 'file-attente-medecin', label: 'File d\'attente' },
         { id: 'imagerie-consultations', label: 'Consultations Imagerie' },
         { id: 'historique-prestations-medecin', label: 'Historique des prestations' },
@@ -258,8 +342,8 @@ const AppShell = ({ isPublic }) => {
     !hasRole('SUPER_ADMIN') && {
       id: 'rh', icon: Users, label: 'Ressources humaines', subs: [
         { id: 'personnel', label: 'Personnel' },
-        { id: 'absences', label: 'Absences' },
-        { id: 'conges', label: 'Congés' },
+        //{ id: 'absences', label: 'Absences' },
+        //{ id: 'conges', label: 'Congés' },
         { id: 'calcul-paie-personnel', label: 'Calcul rémunération personnel' },
         { id: 'historique-remuneration', label: 'Historique des rémunérations' },
       ]
@@ -379,6 +463,7 @@ const AppShell = ({ isPublic }) => {
             {activeTab === 'remboursements' && <MaSessionView showToast={showToast} initialTab="remboursements" />}
             {activeTab === 'audit-caisses' && <AuditCaissesView showToast={showToast} />}
             {activeTab === 'depenses-diverses' && <DepensesDiversesView showToast={showToast} />}
+            {activeTab === 'comptes-bancaires' && <ComptesBancairesView showToast={showToast} />}
             {activeTab === 'etats-periodiques' && <EtatsPeriodiquesView showToast={showToast} />}
             {activeTab === 'factures-assurance' && <FacturesAssuranceView showToast={showToast} />}
             {activeTab === 'prestations-patients' && <PrestationsView showToast={showToast} />}
@@ -397,6 +482,9 @@ const AppShell = ({ isPublic }) => {
             {activeTab === 'settings-insurers' && <InsurersManagement showToast={showToast} />}
             {activeTab === 'settings-subscribers' && <SubscribersManagement showToast={showToast} />}
             {activeTab === 'personnel' && <StaffManagement showToast={showToast} />}
+            {activeTab === 'calcul-paie-personnel' && <RemunerationCalculView showToast={showToast} initialTab="calcul" />}
+            {activeTab === 'historique-remuneration' && <RemunerationCalculView showToast={showToast} initialTab="history" />}
+            {activeTab === 'remuneration-personnel' && <RemunerationCalculView showToast={showToast} initialTab="history" />}
             {activeTab === 'settings-insurance' && <InsuranceConventions showToast={showToast} />}
             {activeTab === 'settings-nomenclatures' && <NomenclatureManagement showToast={showToast} />}
             {activeTab === 'patients-list' && (
@@ -409,7 +497,25 @@ const AppShell = ({ isPublic }) => {
                     title="Registre des patients" columns={[
                       { label: 'Code', key: 'patientCode', render: (p) => <span className="font-mono text-[11px] text-sky-600 font-black">{p.patientCode}</span> },
                       { label: 'N° Dossier', key: 'dossierNumber', render: (p) => <span className="font-mono text-[11px] text-slate-500">{p.dossierNumber || '---'}</span> },
-                      { label: 'Nom & Prénom', key: 'fullName', render: (p) => <span className="font-black text-slate-700 uppercase">{p.fullName}</span> },
+                      {
+                        label: 'Nom & Prénom',
+                        key: 'fullName',
+                        render: (p) => {
+                          const hasInsurance = !!p.insurer;
+                          return (
+                            <div className="flex flex-col">
+                              <span className={`uppercase text-slate-700 ${hasInsurance ? 'font-black' : 'font-normal italic text-slate-500'}`}>
+                                {p.fullName}
+                              </span>
+                              {hasInsurance && (
+                                <span className="text-[10px] text-teal-600 font-bold mt-0.5">
+                                  🛡️ Assuré : {p.insurer} {p.policyNumber ? `(n° ${p.policyNumber})` : ''} - {p.coverageRate || 0}%
+                                </span>
+                              )}
+                            </div>
+                          );
+                        }
+                      },
                       {
                         label: 'Sexe', key: 'gender', render: (p) => (
                           <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${p.gender === 'M' || p.gender === 'Masculin' ? 'bg-sky-100 text-sky-700' : 'bg-rose-100 text-rose-700'}`}>
@@ -417,7 +523,37 @@ const AppShell = ({ isPublic }) => {
                           </span>
                         )
                       },
-                      { label: 'Date de Naissance', key: 'birthDate', render: (p) => <span className="font-bold text-slate-600 uppercase">{p.birthDate}</span> },
+                      {
+                        label: 'Téléphone',
+                        key: 'phone1',
+                        render: (p) => (
+                          <span className="font-semibold text-slate-600 font-mono text-xs">
+                            {[p.phone1, p.phone2].filter(Boolean).join(' / ') || '—'}
+                          </span>
+                        )
+                      },
+                      {
+                        label: 'Date de Naissance',
+                        key: 'birthDate',
+                        render: (p) => {
+                          const ageInfo = computeAgeAndTranche(p.birthDate);
+                          return (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-bold text-slate-600 uppercase text-xs">
+                                {formatBirthDate(p.birthDate)}
+                              </span>
+                              {ageInfo && (
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-[10px] text-slate-500 font-semibold">{ageInfo.ageLabel}</span>
+                                  <span className={`px-1.5 py-0.25 rounded text-[8px] font-black uppercase tracking-wider ${ageInfo.badgeClass}`}>
+                                    {ageInfo.tranche}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+                      },
                       { label: 'Statut', key: 'isActive', render: () => <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-[9px] font-black uppercase border border-emerald-200">Actif</span> }
                     ]} data={patients} loading={loading}
                     onSearch={(val) => { setSearch(val); loadPatients(val, 0); }}
@@ -425,7 +561,6 @@ const AppShell = ({ isPublic }) => {
                     onView={handleViewPatient}
                     onEdit={handleEditPatient}
                     onBill={handleBillPatient}
-                    onDelete={handleDeletePatient}
                     pagination={{
                       currentPage: page, totalPages, totalElements, pageSize,
                       onPageChange: handlePageChange, onPageSizeChange: handlePageSizeChange

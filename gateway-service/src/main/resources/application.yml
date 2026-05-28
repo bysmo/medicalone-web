@@ -47,7 +47,7 @@ spring:
         - id: patient-service
           uri: lb://patient-service
           predicates:
-            - Path=/api/v1/patients/**, /api/v1/insurances/**, /api/v1/conventions/**, /api/v1/practitioners/**, /api/v1/invoices/**, /api/v1/prestations/**, /api/v1/medical-acts/**
+            - Path=/api/v1/patients/**, /api/v1/insurances/**, /api/v1/conventions/**, /api/v1/practitioners/**, /api/v1/invoices/**, /api/v1/prestations/**, /api/v1/medical-acts/**, /api/v1/staff-remunerations/**
         - id: medical-record-service
           uri: lb://medical-record-service
           predicates:

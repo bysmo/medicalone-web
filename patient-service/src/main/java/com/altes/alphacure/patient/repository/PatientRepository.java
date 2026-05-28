@@ -38,4 +38,7 @@ public interface PatientRepository extends JpaRepository<Patient, UUID> {
     boolean existsByPatientCodeAndClinicId(String patientCode, UUID clinicId);
 
     List<Patient> findByClinicId(UUID clinicId);
+
+    long countByClinicIdAndCreatedByAndCreatedAtBetween(
+            UUID clinicId, String createdBy, java.time.LocalDateTime start, java.time.LocalDateTime end);
 }

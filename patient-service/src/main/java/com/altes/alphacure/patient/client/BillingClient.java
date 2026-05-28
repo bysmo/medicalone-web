@@ -25,4 +25,9 @@ public interface BillingClient {
 
     @PostMapping("/api/v1/cash-sessions/transaction")
     Map<String, Object> addTransaction(@RequestBody Map<String, Object> body);
+
+    @GetMapping("/api/v1/cash-sessions/stats")
+    Map<String, Object> getCashierStats(
+            @org.springframework.web.bind.annotation.RequestParam("cashierUsername") String cashierUsername,
+            @org.springframework.web.bind.annotation.RequestParam("month") String month);
 }

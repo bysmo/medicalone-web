@@ -31,6 +31,7 @@ public class PatientService {
     private final PatientRepository patientRepository;
     private final KafkaTemplate<String, PatientCreatedEvent> kafkaTemplate;
     private final ClinicClient clinicClient;
+    private final com.altes.alphacure.patient.security.ClinicContextHolder clinicContextHolder;
 
     public PatientResponse createPatient(UUID clinicId, PatientRequest request) {
         String code = generatePatientCode(clinicId);
@@ -70,6 +71,7 @@ public class PatientService {
                 .insuranceStartDate(request.getInsuranceStartDate())
                 .insuranceEndDate(request.getInsuranceEndDate())
                 .isActive(request.getIsActive() != null ? request.getIsActive() : true)
+                .createdBy(clinicContextHolder.getUsername() != null ? clinicContextHolder.getUsername() : "system")
                 .accessLevel(0)
                 .build();
 

@@ -25,6 +25,7 @@ const AuditCaissesView = ({ showToast }) => {
   const [transferringId, setTransferringId] = useState(null);
   const [caissesNomenclature, setCaissesNomenclature] = useState([]);
   const [comptesNomenclature, setComptesNomenclature] = useState([]);
+  const [settlementAccounts, setSettlementAccounts] = useState([]);
   const [balances, setBalances] = useState({ caisses: {}, comptes: {} });
   const [loadingBalances, setLoadingBalances] = useState(false);
 
@@ -43,13 +44,15 @@ const AuditCaissesView = ({ showToast }) => {
   async function loadBalancesAndNomenclatures() {
     setLoadingBalances(true);
     try {
-      const [caisRes, compRes, balRes] = await Promise.all([
+      const [caisRes, profileRes, balRes] = await Promise.all([
         nomenclatureService.search('CAISSES_TRESORERIE', 'FINANCES').catch(() => ({ data: [] })),
-        nomenclatureService.search('COMPTES_BANCAIRES', 'FINANCES').catch(() => ({ data: [] })),
+        clinicService.getMyProfile().catch(() => null),
         cashSessionService.getBalances().catch(() => ({ data: { caisses: {}, comptes: {} } }))
       ]);
       setCaissesNomenclature(caisRes.data || []);
-      setComptesNomenclature(compRes.data || []);
+      const profile = profileRes?.data?.profile;
+      const accounts = profile?.bankAccounts || [];
+      setSettlementAccounts(accounts);
       setBalances(balRes.data || { caisses: {}, comptes: {} });
     } catch (err) {
       console.error("Error loading balances or nomenclatures", err);
@@ -146,7 +149,7 @@ const AuditCaissesView = ({ showToast }) => {
   };
 
   // Reusable print receipts logic
-  const handlePrintReceipt = async (invoiceId, paymentMethod = 'ESPECES') => {
+  const handlePrintReceipt = async (invoiceId, paymentMethod = 'ESPECES', bankAccountCode = null) => {
     if (!invoiceId || invoiceId === 'Manuel') return;
     showToast("Préparation de l'impression du reçu...", "info");
     try {
@@ -172,6 +175,22 @@ const AuditCaissesView = ({ showToast }) => {
       if (!patient) {
         showToast("Patient introuvable.", "error");
         return;
+      }
+
+      const accounts = clinicProfile?.bankAccounts || [];
+      const selectedAccount = accounts.find(a => a.id === bankAccountCode);
+
+      let paymentInfoHtml = '';
+      if (selectedAccount) {
+        if (selectedAccount.type === 'MOBILE_MONEY') {
+          paymentInfoHtml = `<span>Mobile Money (${selectedAccount.providerName} - ${selectedAccount.phoneNumber})</span>`;
+        } else if (selectedAccount.type === 'VIREMENT_BANCAIRE') {
+          paymentInfoHtml = `<span>Virement Bancaire (${selectedAccount.bankName} - N°: ${selectedAccount.accountNumber})</span>`;
+        } else if (selectedAccount.type === 'ESPECES') {
+          paymentInfoHtml = `<span>Espèces (${selectedAccount.name})</span>`;
+        }
+      } else {
+        paymentInfoHtml = `<span>${paymentMethod === 'ESPECES' ? 'Espèces' : paymentMethod}</span>`;
       }
 
       const headerImg = clinicProfile?.printHeaderA4 || clinicProfile?.printHeaderA5 || '';
@@ -239,25 +258,25 @@ const AuditCaissesView = ({ showToast }) => {
             </style>
           </head>
           <body>
-            ${headerImg ? '<img class="header-img" src="' + headerImg + '" alt="Header" />' : '<div style="text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 20px;">' + (clinic?.name || 'CLINIQUE') + '</div>'}
+            \${headerImg ? '<img class="header-img" src="' + headerImg + '" alt="Header" />' : '<div style="text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 20px;">' + (clinic?.name || 'CLINIQUE') + '</div>'}
             <div class="title">Reçu de Paiement</div>
             <table class="info-table">
               <tr>
                 <td style="width: 55%;">
-                  <span class="bold" style="font-size: 13px; color: #0f172a;">Patient : ${patient.firstName} ${patient.lastName}</span><br/>
-                  Code Patient : ${patient.patientCode}<br/>
-                  Téléphone : ${patient.phone1}<br/>
-                  Adresse : ${patient.address || 'Non spécifiée'}
+                  <span class="bold" style="font-size: 13px; color: #0f172a;">Patient : \${patient.firstName} \${patient.lastName}</span><br/>
+                  Code Patient : \${patient.patientCode}<br/>
+                  Téléphone : \${patient.phone1}<br/>
+                  Adresse : \${patient.address || 'Non spécifiée'}
                 </td>
                 <td style="width: 45%; text-align: right;">
-                  <span class="bold">Reçu N° : ${invoice.invoiceRef}</span><br/>
-                  Date : ${new Date(invoice.createdAt).toLocaleString()}<br/>
+                  <span class="bold">Reçu N° : \${invoice.invoiceRef}</span><br/>
+                  Date : \${new Date(invoice.createdAt).toLocaleString()}<br/>
                   Statut : <span style="color: #16a34a; font-weight: bold;">RÉGLÉ</span><br/>
-                  Mode de règlement : ${paymentMethod}
+                  Mode de règlement : \${paymentInfoHtml}
                 </td>
               </tr>
             </table>
-            ${insuranceSection}
+            \${insuranceSection}
             <table class="items-table">
               <thead>
                 <tr>
@@ -539,7 +558,19 @@ const AuditCaissesView = ({ showToast }) => {
     {
       label: 'Mode de règlement',
       key: 'paymentMethod',
-      render: (row) => <span className="font-bold text-slate-600">{row.paymentMethod || 'ESPECES'}</span>
+      render: (row) => {
+        const matched = settlementAccounts.find(a => {
+          if (a.type === row.paymentMethod) {
+            if (a.type === 'ESPECES') return true;
+            return a.id === row.bankAccountCode;
+          }
+          return false;
+        });
+        if (matched) {
+          return <span className="font-bold text-slate-600">{matched.name}</span>;
+        }
+        return <span className="font-bold text-slate-600">{row.paymentMethod || 'ESPECES'}</span>;
+      }
     },
     {
       label: 'ID Référence',
@@ -723,28 +754,36 @@ const AuditCaissesView = ({ showToast }) => {
                   </div>
                 </div>
 
-                {/* Comptes bancaires */}
+                {/* Comptes de Règlement */}
                 <div className="space-y-4">
                   <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-2">
-                    Comptes Bancaires
+                    Comptes de Règlement
                   </h4>
                   <div className="space-y-2.5">
-                    {comptesNomenclature.map(compte => {
-                      const balance = balances.comptes[compte.code] || 0;
-                      return (
-                        <div key={compte.code} className="flex justify-between items-center p-3.5 bg-slate-50 border border-slate-200/50 rounded-xl hover:border-slate-300 hover:bg-slate-100/50 transition-all">
-                          <div>
-                            <span className="text-xs font-bold text-slate-700 block">{compte.string1}</span>
-                            <span className="text-[9px] font-black text-slate-400 font-mono uppercase">{compte.code}</span>
+                    {settlementAccounts
+                      .filter(acc => acc.type !== 'ESPECES')
+                      .map(compte => {
+                        const balance = balances.comptes[compte.id] || balances.comptes[compte.code] || 0;
+                        let labelStr = compte.name;
+                        if (compte.type === 'MOBILE_MONEY') {
+                          labelStr = `${compte.name} (${compte.providerName})`;
+                        } else if (compte.type === 'VIREMENT_BANCAIRE') {
+                          labelStr = `${compte.name} (${compte.bankName})`;
+                        }
+                        return (
+                          <div key={compte.id} className="flex justify-between items-center p-3.5 bg-slate-50 border border-slate-200/50 rounded-xl hover:border-slate-300 hover:bg-slate-100/50 transition-all">
+                            <div>
+                              <span className="text-xs font-bold text-slate-700 block">{labelStr}</span>
+                              <span className="text-[9px] font-black text-slate-400 font-mono uppercase">{compte.type}</span>
+                            </div>
+                            <span className={`text-sm font-black font-mono ${balance > 0 ? 'text-emerald-600' : balance < 0 ? 'text-rose-600' : 'text-slate-500'}`}>
+                              {formatCurrency(balance)} FCFA
+                            </span>
                           </div>
-                          <span className={`text-sm font-black font-mono ${balance > 0 ? 'text-emerald-600' : balance < 0 ? 'text-rose-600' : 'text-slate-500'}`}>
-                            {formatCurrency(balance)} FCFA
-                          </span>
-                        </div>
-                      );
-                    })}
-                    {comptesNomenclature.length === 0 && (
-                      <p className="text-xs text-slate-400 italic">Aucun compte bancaire paramétré</p>
+                        );
+                      })}
+                    {settlementAccounts.filter(acc => acc.type !== 'ESPECES').length === 0 && (
+                      <p className="text-xs text-slate-400 italic">Aucun compte de règlement configuré</p>
                     )}
                   </div>
                 </div>
@@ -856,7 +895,7 @@ const AuditCaissesView = ({ showToast }) => {
               pagination={transactionsPagination}
               extraActions={(row) => row.referenceId && row.referenceId !== 'Manuel' && row.type === 'ENCAISSEMENT' && (
                 <button
-                  onClick={() => handlePrintReceipt(row.referenceId, row.paymentMethod || 'ESPECES')}
+                  onClick={() => handlePrintReceipt(row.referenceId, row.paymentMethod || 'ESPECES', row.bankAccountCode)}
                   title="Réimprimer le reçu de paiement"
                   className="bg-sky-50 hover:bg-sky-100 text-sky-700 px-2 py-1.5 rounded text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 mx-auto transition-all cursor-pointer"
                 >

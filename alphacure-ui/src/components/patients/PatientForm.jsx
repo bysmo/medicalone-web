@@ -70,7 +70,13 @@ const PatientFormView = ({ onBack, onSave, patient = null, isViewOnly = false, s
           <div className="bg-sky-700 rounded shadow-lg p-6 text-white grid grid-cols-3 gap-6 items-center">
             <div>
               <label className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-1 block">N° Dossier Physique</label>
-              <input type="text" readOnly className="w-full bg-white/10 border border-white/20 rounded p-3 text-lg font-bold outline-none cursor-not-allowed" value={formData.dossierNumber} />
+              <input
+                type="text"
+                readOnly={isViewOnly}
+                className={`w-full bg-white/10 border border-white/20 rounded p-3 text-lg font-bold outline-none ${isViewOnly ? 'cursor-not-allowed' : 'focus:bg-white/20'}`}
+                value={formData.dossierNumber || ''}
+                onChange={e => handleChange('dossierNumber', e.target.value)}
+              />
             </div>
             <div>
               <label className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-1 block text-emerald-300">N° Sécurité Sociale</label>

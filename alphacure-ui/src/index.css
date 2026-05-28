@@ -1,13 +1,63 @@
 @import "tailwindcss";
 
+/* ============================================================
+   ALPHACURE DESIGN SYSTEM
+   Colors extracted from the AlphaCure logo:
+   - Primary Teal:    #1a7f97 (medical cross - dark teal)
+   - Medical Green:   #1a7a47 (letter A - deep green)
+   - Gold Accent:     #e8a020 (star symbol)
+   - Medical Red:     #c0392b (cross accent)
+   - Sidebar Dark:    #0f2335 (deep navy-teal)
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --ac-teal-50:   #edf7f9;
+  --ac-teal-100:  #d0edf2;
+  --ac-teal-200:  #a2dae6;
+  --ac-teal-300:  #65c0d3;
+  --ac-teal-400:  #359fb8;
+  --ac-teal-500:  #1a7f97;
+  --ac-teal-600:  #0d6478;
+  --ac-teal-700:  #0a4f5e;
+  --ac-teal-800:  #083d49;
+  --ac-teal-900:  #062f38;
+
+  --ac-green-50:  #edf7f1;
+  --ac-green-100: #d0eedc;
+  --ac-green-200: #9fd9b8;
+  --ac-green-300: #64be8d;
+  --ac-green-400: #35a066;
+  --ac-green-500: #1a7a47;
+  --ac-green-600: #156039;
+  --ac-green-700: #10492c;
+  --ac-green-800: #0b3520;
+  --ac-green-900: #072716;
+
+  --ac-gold:      #e8a020;
+  --ac-gold-light:#f5c84a;
+  --ac-red:       #c0392b;
+  --ac-red-light: #e74c3c;
+
+  --ac-sidebar:   #0f2335;
+  --ac-sidebar-2: #162d41;
+  --ac-sidebar-3: #1c3750;
+  --ac-sidebar-border: rgba(255,255,255,0.07);
+
+  --ac-text-primary:   #1a2e3b;
+  --ac-text-secondary: #4a6574;
+  --ac-text-muted:     #8aa0ac;
+  --ac-border:         #d1e3ea;
+  --ac-bg:             #f0f7f9;
+  --ac-bg-card:        #ffffff;
+
+  font-family: 'Inter', system-ui, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #0f172a;
+  color-scheme: light;
+  color: var(--ac-text-primary);
+  background-color: var(--ac-bg);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -26,21 +76,99 @@ body {
   width: 100%;
 }
 
+/* ── Glass Cards ──────────────────────────────────────────── */
 .glass-card {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(26, 127, 151, 0.15);
   border-radius: 1rem;
 }
 
+/* ── Primary Button ───────────────────────────────────────── */
 .btn-primary {
-  @apply px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg transition-all duration-200 flex items-center gap-2 shadow-lg shadow-sky-500/20 active:scale-95;
+  @apply px-4 py-2 text-white rounded-lg transition-all duration-200 flex items-center gap-2 shadow-lg active:scale-95 font-bold text-sm;
+  background: var(--ac-teal-500);
+  box-shadow: 0 4px 14px rgba(26, 127, 151, 0.3);
+}
+.btn-primary:hover {
+  background: var(--ac-teal-600);
+  box-shadow: 0 6px 20px rgba(26, 127, 151, 0.4);
 }
 
+.btn-secondary {
+  @apply px-4 py-2 text-white rounded-lg transition-all duration-200 flex items-center gap-2 shadow-lg active:scale-95 font-bold text-sm;
+  background: var(--ac-green-500);
+  box-shadow: 0 4px 14px rgba(26, 122, 71, 0.3);
+}
+.btn-secondary:hover {
+  background: var(--ac-green-600);
+}
+
+/* ── Sidebar Items ────────────────────────────────────────── */
 .sidebar-item {
-  @apply flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer text-slate-400 hover:bg-white/5 hover:text-white;
+  @apply flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer;
+  color: rgba(255,255,255,0.55);
+}
+.sidebar-item:hover {
+  background: rgba(26, 127, 151, 0.15);
+  color: rgba(255,255,255,0.9);
+}
+.sidebar-item.active {
+  background: linear-gradient(135deg, var(--ac-teal-500), var(--ac-teal-600));
+  color: white;
+  box-shadow: 0 4px 12px rgba(26, 127, 151, 0.35);
 }
 
-.sidebar-item.active {
-  @apply bg-sky-500 text-white shadow-lg shadow-sky-500/20;
+/* ── Input Focus States ───────────────────────────────────── */
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--ac-teal-400) !important;
+  box-shadow: 0 0 0 3px rgba(26, 127, 151, 0.12);
+}
+
+/* ── Scrollbar Styling ────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--ac-teal-50);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--ac-teal-300);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ac-teal-500);
+}
+
+/* ── Form Sections ────────────────────────────────────────── */
+.form-section-header {
+  background: linear-gradient(135deg, var(--ac-sidebar) 0%, var(--ac-sidebar-3) 100%);
+  color: white;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 800;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── Badge Variants ───────────────────────────────────────── */
+.badge-teal {
+  background: var(--ac-teal-50);
+  color: var(--ac-teal-700);
+  border: 1px solid var(--ac-teal-200);
+}
+.badge-green {
+  background: var(--ac-green-50);
+  color: var(--ac-green-700);
+  border: 1px solid var(--ac-green-200);
+}
+.badge-gold {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
 }

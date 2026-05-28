@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Activity, Landmark, Key, Unlock, Lock, AlertTriangle, FileText, CheckCircle2,
-  ArrowUpRight, ArrowDownRight, RefreshCw, Printer, PlusCircle, Check
+  ArrowUpRight, ArrowDownRight, RefreshCw, Printer, PlusCircle, Check, Trash2, XCircle
 } from 'lucide-react';
-import { cashSessionService, nomenclatureService, invoiceService, practitionerService, patientService, clinicService } from '../../services/api';
+import { cashSessionService, nomenclatureService, invoiceService, practitionerService, patientService, clinicService, prestationService } from '../../services/api';
 import DataTable from '../ui/DataTable';
 import { useClientTable } from '../../hooks/useClientTable';
 
@@ -12,8 +12,10 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
   const [activeSession, setActiveSession] = useState(null);
   const [loadingSession, setLoadingSession] = useState(true);
   const [caisses, setCaisses] = useState([]);
-  const [bankAccounts, setBankAccounts] = useState([]);
-  const [selectedBankAccount, setSelectedBankAccount] = useState('');
+  const [bankAccounts, setBankAccounts] = useState([]); // list of configured settlement accounts
+  const [selectedBankAccount, setSelectedBankAccount] = useState(''); // ID of selected settlement account
+  const [selectedSettlementAccount, setSelectedSettlementAccount] = useState(null);
+
 
   // Session Opening state
   const [selectedCaisse, setSelectedCaisse] = useState('');
@@ -36,6 +38,13 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
   const [txAmount, setTxAmount] = useState('');
   const [txLabel, setTxLabel] = useState('');
   const [savingTx, setSavingTx] = useState(false);
+
+  // Bank Transfer Form state
+  const [bankTxType, setBankTxType] = useState('TRANSFERT_BANQUE');
+  const [bankTxAmount, setBankTxAmount] = useState('');
+  const [bankTxLabel, setBankTxLabel] = useState('');
+  const [selectedBankAccountIdForTransfer, setSelectedBankAccountIdForTransfer] = useState('');
+  const [savingBankTx, setSavingBankTx] = useState(false);
 
   // Pending Invoices
   const [pendingInvoices, setPendingInvoices] = useState([]);
@@ -67,6 +76,17 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
     initialPageSize: 10,
   });
 
+  // Refunds (Cancellation Requests)
+  const [pendingRefunds, setPendingRefunds] = useState([]);
+  const [loadingRefunds, setLoadingRefunds] = useState(false);
+  const [selectedRefund, setSelectedRefund] = useState(null);
+  const [processingRefund, setProcessingRefund] = useState(false);
+
+  const { onSearch: onSearchRefunds, paginated: paginatedRefunds, pagination: refundsPagination } = useClientTable(pendingRefunds, {
+    searchKeys: ['actName', 'patientName', 'invoiceRef', 'reason'],
+    initialPageSize: 10,
+  });
+
   // Ref for print
   const printRef = useRef(null);
 
@@ -90,19 +110,23 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
 
   async function fetchCaisses() {
     try {
-      const [res, sessionsRes, bankRes] = await Promise.all([
+      const [res, sessionsRes, profileRes] = await Promise.all([
         nomenclatureService.search('CAISSES_TRESORERIE', 'FINANCES'),
         cashSessionService.getAll().catch(() => ({ data: [] })),
-        nomenclatureService.search('COMPTES_BANCAIRES', 'FINANCES').catch(() => ({ data: [] }))
+        clinicService.getMyProfile().catch(() => null)
       ]);
       const caissesList = res.data || [];
       const sessions = sessionsRes.data || [];
-      const bankAccountsList = bankRes.data || [];
+      const profile = profileRes?.data?.profile;
+      const bankAccountsList = profile?.bankAccounts || [];
       
       setBankAccounts(bankAccountsList);
       if (bankAccountsList.length > 0) {
-        setSelectedBankAccount(bankAccountsList[0].code);
+        const primaryAcc = bankAccountsList.find(a => a.primary) || bankAccountsList[0];
+        setSelectedBankAccount(primaryAcc.id || primaryAcc.code || '');
+        setSelectedSettlementAccount(primaryAcc);
       }
+
 
       // Get codes of all currently open cash sessions
       const openCaisseCodes = sessions
@@ -182,6 +206,54 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
     }
   }
 
+  async function fetchPendingRefunds() {
+    setLoadingRefunds(true);
+    try {
+      const res = await prestationService.getPendingCancellations();
+      setPendingRefunds(res.data || []);
+    } catch (err) {
+      console.error("Error loading pending refunds", err);
+    } finally {
+      setLoadingRefunds(false);
+    }
+  }
+
+  const handleApproveRefund = async (refundId) => {
+    setProcessingRefund(true);
+    try {
+      await prestationService.approveRefund(refundId, {});
+      showToast("Remboursement validé avec succès !", "success");
+      setSelectedRefund(null);
+      fetchPendingRefunds();
+      if (activeSession) {
+        fetchTransactions(activeSession.id);
+        fetchActiveSession();
+      }
+    } catch (err) {
+      console.error("Error approving refund", err);
+      const errMsg = err.response?.data?.message || "Erreur lors de la validation du remboursement.";
+      showToast(errMsg, "error");
+    } finally {
+      setProcessingRefund(false);
+    }
+  };
+
+  const handleRejectRefund = async (refundId) => {
+    setProcessingRefund(true);
+    try {
+      await prestationService.rejectRefund(refundId, {});
+      showToast("Demande de remboursement rejetée.", "info");
+      setSelectedRefund(null);
+      fetchPendingRefunds();
+    } catch (err) {
+      console.error("Error rejecting refund", err);
+      showToast("Erreur lors du rejet du remboursement.", "error");
+    } finally {
+      setProcessingRefund(false);
+    }
+  };
+
+
   // UseEffects using the fetch helpers
   useEffect(() => {
     setTimeout(() => {
@@ -210,6 +282,8 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
         fetchPendingInvoices();
       } else if (activeTab === 'encaissements') {
         fetchSessionsHistory();
+      } else if (activeTab === 'remboursements') {
+        fetchPendingRefunds();
       }
     }, 0);
   }, [activeTab]);
@@ -302,10 +376,14 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
     }
     setSavingTx(true);
     try {
+      const pm = selectedSettlementAccount ? selectedSettlementAccount.type : 'ESPECES';
+      const bac = selectedSettlementAccount && selectedSettlementAccount.type !== 'ESPECES' ? selectedSettlementAccount.id : null;
       await cashSessionService.addTransaction({
         type: txType,
         amount: parseFloat(txAmount),
-        label: txLabel
+        label: txLabel,
+        paymentMethod: pm,
+        bankAccountCode: bac
       });
       showToast("Opération enregistrée avec succès !", "success");
       setTxAmount('');
@@ -319,13 +397,81 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
     }
   };
 
+  const handleBankTransferSubmit = async (e) => {
+    e.preventDefault();
+    if (!bankTxAmount || parseFloat(bankTxAmount) <= 0) {
+      showToast("Veuillez entrer un montant valide supérieur à 0.", "error");
+      return;
+    }
+    if (!selectedBankAccountIdForTransfer) {
+      showToast("Veuillez sélectionner un compte bancaire.", "error");
+      return;
+    }
+    if (!bankTxLabel.trim()) {
+      showToast("Veuillez spécifier le motif.", "error");
+      return;
+    }
+
+    setSavingBankTx(true);
+    try {
+      const type = bankTxType === 'TRANSFERT_BANQUE' ? 'DECAISSEMENT' : 'ENCAISSEMENT';
+      const label = bankTxType === 'TRANSFERT_BANQUE'
+        ? `Transfert Caisse -> Banque : ${bankTxLabel}`
+        : `Approvisionnement Banque -> Caisse : ${bankTxLabel}`;
+
+      await cashSessionService.addTransaction({
+        type: type,
+        amount: parseFloat(bankTxAmount),
+        label: label,
+        paymentMethod: 'VIREMENT',
+        bankAccountCode: selectedBankAccountIdForTransfer,
+        expenseCategory: bankTxType
+      });
+
+      showToast("Opération soumise en validation auprès du manager.", "success");
+      setBankTxAmount('');
+      setBankTxLabel('');
+      fetchActiveSession();
+    } catch (err) {
+      console.error(err);
+      const errMsg = err.response?.data?.message || "Erreur lors de la soumission de l'opération.";
+      showToast(errMsg, "error");
+    } finally {
+      setSavingBankTx(false);
+    }
+  };
+
+  const handleCancelBankTransfer = async (txId) => {
+    try {
+      await cashSessionService.deleteTransaction(txId);
+      showToast("Opération annulée avec succès.", "info");
+      fetchActiveSession();
+    } catch (err) {
+      console.error(err);
+      showToast("Erreur lors de l'annulation de l'opération.", "error");
+    }
+  };
+
   const handlePayInvoice = (invoice) => {
     if (!activeSession) {
       showToast("Veuillez d'abord ouvrir une session de caisse.", "error");
       return;
     }
     setSelectedInvoice(invoice);
-    setMoyenPaiement('ESPECES');
+    
+    // Filter eligible accounts:
+    // ESPECES accounts must be eligible for activeSession.caisseCode
+    const eligible = bankAccounts.filter(acc => {
+      if (acc.type === 'ESPECES') {
+        return (acc.eligibleCaisseCodes || []).includes(activeSession.caisseCode);
+      }
+      return true;
+    });
+    
+    const defaultAcc = eligible.find(a => a.primary) || eligible[0] || null;
+    setSelectedSettlementAccount(defaultAcc);
+    setMoyenPaiement(defaultAcc ? defaultAcc.type : 'ESPECES');
+    setSelectedBankAccount(defaultAcc ? defaultAcc.id : '');
     setMontantRecu(invoice.patientAmount.toString());
     setIsPaymentModalOpen(true);
   };
@@ -342,20 +488,21 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
 
     setPayingInvoice(true);
     try {
+      const pm = selectedSettlementAccount ? selectedSettlementAccount.type : 'ESPECES';
+      const bac = selectedSettlementAccount && selectedSettlementAccount.type !== 'ESPECES' ? selectedSettlementAccount.id : null;
       await cashSessionService.payInvoice(selectedInvoice.id, {
-        paymentMethod: moyenPaiement,
-        bankAccountCode: moyenPaiement !== 'ESPECES' ? selectedBankAccount : null
+        paymentMethod: pm,
+        bankAccountCode: bac
       });
       showToast(`Facture ${selectedInvoice.invoiceRef} encaissée avec succès !`, "success");
       const paidInvoiceId = selectedInvoice.id;
-      const paidPaymentMethod = moyenPaiement;
       setIsPaymentModalOpen(false);
       setSelectedInvoice(null);
       setMontantRecu('');
       fetchPendingInvoices();
       fetchActiveSession();
       // Trigger printing receipt
-      handlePrintReceipt(paidInvoiceId, paidPaymentMethod);
+      handlePrintReceipt(paidInvoiceId, pm, bac);
     } catch (err) {
       console.error(err);
       const msg = err.response?.data?.message || "Erreur lors de l'encaissement de la facture.";
@@ -364,6 +511,7 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
       setPayingInvoice(false);
     }
   };
+
 
   const handlePrintSlip = () => {
     if (lastClosedSession) {
@@ -582,6 +730,42 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
     }
   ];
 
+  const refundColumns = [
+    {
+      label: "Date Demande",
+      key: "requestedAt",
+      render: (row) => new Date(row.requestedAt).toLocaleString('fr-FR')
+    },
+    {
+      label: "Patient",
+      key: "patientName",
+      render: (row) => <span className="font-black text-slate-700">{row.patientName}</span>
+    },
+    {
+      label: "Acte Médical",
+      key: "actName",
+      render: (row) => <span className="text-slate-600 font-semibold">{row.actName}</span>
+    },
+    {
+      label: "Facture Réf",
+      key: "invoiceRef",
+      render: (row) => <span className="font-mono text-xs text-slate-400">{row.invoiceRef}</span>
+    },
+    {
+      label: "Montant",
+      key: "refundAmount",
+      render: (row) => <span className="font-mono font-black text-rose-600">-{formatCurrency(row.refundAmount)} FCFA</span>
+    },
+    {
+      label: "Motif",
+      key: "reason"
+    },
+    {
+      label: "Demandé par",
+      key: "requestedBy"
+    }
+  ];
+
   // Encaissement columns for DataTable
   const encaissementColumns = [
     {
@@ -664,7 +848,7 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
   ];
 
   // Print Payment Receipt
-  const handlePrintReceipt = async (invoiceId, paymentMethod = 'ESPECES') => {
+  const handlePrintReceipt = async (invoiceId, paymentMethod = 'ESPECES', bankAccountCode = null) => {
     if (!invoiceId || invoiceId === 'Manuel') return;
     showToast("Préparation de l'impression du reçu...", "info");
     try {
@@ -678,6 +862,7 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
       const clinicProfile = clinicRes?.data?.profile;
       const invoice = invoiceRes?.data;
       const lines = linesRes?.data || [];
+      const accounts = clinicProfile?.bankAccounts || [];
 
       if (!invoice) {
         showToast("Impossible de récupérer les détails de la facture.", "error");
@@ -690,6 +875,20 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
       if (!patient) {
         showToast("Impossible de récupérer les détails du patient.", "error");
         return;
+      }
+
+      const selectedAccount = accounts.find(a => a.id === bankAccountCode);
+      let paymentInfoText = paymentMethod;
+      if (selectedAccount) {
+        if (selectedAccount.type === 'MOBILE_MONEY') {
+          paymentInfoText = `Mobile Money (${selectedAccount.providerName} - ${selectedAccount.phoneNumber})`;
+        } else if (selectedAccount.type === 'VIREMENT_BANCAIRE') {
+          paymentInfoText = `Virement Bancaire (${selectedAccount.bankName} - N°: ${selectedAccount.accountNumber})`;
+        } else if (selectedAccount.type === 'ESPECES') {
+          paymentInfoText = `Espèces (Caisse : ${activeSession?.caisseCode || 'Caisse'})`;
+        }
+      } else if (paymentMethod === 'ESPECES') {
+        paymentInfoText = `Espèces (Caisse : ${activeSession?.caisseCode || 'Caisse'})`;
       }
 
       const headerImg = clinicProfile?.printHeaderA4 || clinicProfile?.printHeaderA5 || '';
@@ -765,7 +964,7 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
             ${headerImg ? '<img class="header-img" src="' + headerImg + '" alt="Header" />' : '<div style="text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 20px;">' + (clinic?.name || 'CLINIQUE') + '</div>'}
             
             <div class="title">Reçu de Paiement</div>
-
+ 
             <table class="info-table">
               <tr>
                 <td style="width: 55%;">
@@ -778,10 +977,11 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
                   <span class="bold">Reçu N° : ${invoice.invoiceRef}</span><br/>
                   Date : ${new Date(invoice.createdAt).toLocaleString()}<br/>
                   Statut : <span style="color: #16a34a; font-weight: bold;">RÉGLÉ</span><br/>
-                  Mode de règlement : ${paymentMethod}
+                  Mode de règlement : ${paymentInfoText}
                 </td>
               </tr>
             </table>
+
 
             ${insuranceSection}
 
@@ -845,6 +1045,117 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
     } catch (err) {
       console.error("Error generating receipt printout", err);
       showToast("Erreur lors de la génération de l'impression.", "error");
+    }
+  };
+
+  const handlePrintDisbursementReceipt = async (tx) => {
+    if (!tx) return;
+    showToast("Préparation de l'impression du reçu...", "info");
+    try {
+      const clinicRes = await clinicService.getMyProfile().catch(() => null);
+      const clinic = clinicRes?.data?.clinic;
+      const clinicProfile = clinicRes?.data?.profile;
+      const accounts = clinicProfile?.bankAccounts || [];
+      const selectedAccount = accounts.find(a => a.id === tx.bankAccountCode);
+
+      let paymentInfoHtml = '';
+      if (selectedAccount) {
+        if (selectedAccount.type === 'MOBILE_MONEY') {
+          paymentInfoHtml = `<span>Mobile Money (${selectedAccount.providerName} - ${selectedAccount.phoneNumber})</span>`;
+        } else if (selectedAccount.type === 'VIREMENT_BANCAIRE') {
+          paymentInfoHtml = `<span>Virement Bancaire (${selectedAccount.bankName} - N°: ${selectedAccount.accountNumber})</span>`;
+        } else if (selectedAccount.type === 'ESPECES') {
+          paymentInfoHtml = `<span>Espèces (Caisse : ${activeSession?.caisseCode || 'Caisse'})</span>`;
+        }
+      } else {
+        paymentInfoHtml = `<span>${tx.paymentMethod === 'ESPECES' ? 'Espèces' : tx.paymentMethod}</span>`;
+      }
+
+      const headerImg = clinicProfile?.printHeaderA4 || clinicProfile?.printHeaderA5 || '';
+      const footerImg = clinicProfile?.printFooterA4 || clinicProfile?.printFooterA5 || '';
+
+      const printWindow = window.open('', '', 'width=800,height=900,toolbar=0,scrollbars=0,status=0');
+      if (!printWindow) {
+        showToast("Le bloqueur de fenêtres contextuelles bloque l'impression. Veuillez l'autoriser.", "warning");
+        return;
+      }
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Reçu de Décaissement - ${tx.id.substring(0, 8)}</title>
+            <style>
+              body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; line-height: 1.5; padding: 30px; font-size: 13px; }
+              .header-img { width: 100%; max-height: 120px; object-fit: contain; margin-bottom: 20px; }
+              .title { text-align: center; font-size: 18px; font-weight: bold; margin-top: 10px; margin-bottom: 25px; text-transform: uppercase; color: #be123c; border-bottom: 2px solid #be123c; padding-bottom: 8px; }
+              .details-table { width: 100%; margin-bottom: 25px; border-collapse: collapse; }
+              .details-table td { padding: 8px 12px; border: 1px solid #e2e8f0; }
+              .details-table td.label { font-weight: bold; width: 35%; background-color: #f8fafc; color: #475569; }
+              .bold { font-weight: bold; }
+              .font-mono { font-family: monospace; }
+              .footer-signature { margin-top: 50px; border-top: 1px dashed #cbd5e1; padding-top: 20px; }
+            </style>
+          </head>
+          <body>
+            ${headerImg ? '<img class="header-img" src="' + headerImg + '" alt="Header" />' : '<div style="text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 20px;">' + (clinic?.name || 'CLINIQUE') + '</div>'}
+            
+            <div class="title">Bon de Décaissement / Remboursement</div>
+
+            <table class="details-table">
+              <tr>
+                <td class="label">Date / Heure :</td>
+                <td>${new Date(tx.createdAt).toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td class="label">Description :</td>
+                <td class="bold">${tx.label}</td>
+              </tr>
+              <tr>
+                <td class="label">Mode de règlement :</td>
+                <td>${paymentInfoHtml}</td>
+              </tr>
+              <tr>
+                <td class="label">Montant :</td>
+                <td class="bold" style="color: #dc2626; font-size: 15px;">${formatCurrency(tx.amount)} FCFA</td>
+              </tr>
+              <tr>
+                <td class="label">Session Trésorerie :</td>
+                <td class="font-mono">${activeSession?.sessionRef || 'Session'}</td>
+              </tr>
+            </table>
+
+            <div class="footer-signature">
+              <table style="width: 100%;">
+                <tr>
+                  <td>
+                    <strong>Le Caissier / Agent :</strong><br/>
+                    ${activeSession?.cashierUsername || 'Caisse'}<br/><br/>
+                    Signature : ______________________
+                  </td>
+                  <td style="text-align: right; vertical-align: top;">
+                    <strong>Bénéficiaire :</strong><br/><br/>
+                    Signature : ______________________
+                  </td>
+                </tr>
+              </table>
+            </div>
+
+            ${footerImg ? '<div style="text-align: center; margin-top: 50px;"><img class="footer-img" src="' + footerImg + '" alt="Footer" /></div>' : ''}
+
+            <script>
+              window.onload = function() {
+                window.focus();
+                window.print();
+                window.close();
+              }
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } catch (err) {
+      console.error("Error printing disbursement receipt", err);
+      showToast("Erreur lors de l'impression du reçu.", "error");
     }
   };
 
@@ -919,6 +1230,23 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
         >
           Remboursements / Décaissements
         </button>
+        {activeSession && activeSession.caisseCode === 'CAISSE_PRINCIPALE' && (
+          <button
+            onClick={() => {
+              setActiveTab('transferts-banques');
+              if (bankAccounts.length > 0 && !selectedBankAccountIdForTransfer) {
+                const virementAccs = bankAccounts.filter(a => a.type === 'VIREMENT_BANCAIRE');
+                if (virementAccs.length > 0) {
+                  setSelectedBankAccountIdForTransfer(virementAccs[0].id);
+                }
+              }
+            }}
+            className={`px-5 py-2.5 font-bold text-xs uppercase tracking-widest border-b-2 transition-all whitespace-nowrap ${activeTab === 'transferts-banques' ? 'border-sky-600 text-sky-600' : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}
+          >
+            Transferts & Approvisionnements Banque
+          </button>
+        )}
       </div>
 
       {/* Render selected view */}
@@ -1311,7 +1639,7 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
             pagination={encaissementsPagination}
             extraActions={(row) => row.referenceId && row.referenceId !== 'Manuel' && (
               <button
-                onClick={() => handlePrintReceipt(row.referenceId, row.paymentMethod || 'ESPECES')}
+                onClick={() => handlePrintReceipt(row.referenceId, row.paymentMethod || 'ESPECES', row.bankAccountCode)}
                 title="Réimprimer le reçu"
                 className="bg-sky-600 hover:bg-sky-700 text-white px-2.5 py-1.5 rounded text-[10px] font-black uppercase tracking-wider shadow-sm flex items-center justify-center gap-1 mx-auto"
               >
@@ -1331,78 +1659,125 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
             pagination={historyPagination}
           />
         </div>
+      ) : activeTab === 'remboursements' ? (
+        // TAB 2.4 — Prestation Refund Requests
+        <div className="space-y-6">
+          <DataTable
+            title="Demandes de remboursements de prestations en attente"
+            columns={refundColumns}
+            data={paginatedRefunds}
+            loading={loadingRefunds}
+            onSearch={onSearchRefunds}
+            searchPlaceholder="Rechercher par patient, acte ou motif..."
+            entryLabel="demandes"
+            pagination={refundsPagination}
+            extraActions={(row) => (
+              <button
+                onClick={() => setSelectedRefund(row)}
+                className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded text-[10px] font-black uppercase tracking-wider shadow-sm flex items-center justify-center gap-1 mx-auto"
+                title="Traiter le remboursement"
+              >
+                Traiter
+              </button>
+            )}
+          />
+        </div>
       ) : (
-        // TAB 2.4 — Disbursements (Remboursements/Décaissements)
+        // TAB 2.5 — Bank Transfers (Transferts & Approvisionnements Banque)
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* New manual operation */}
+          {/* New bank operation */}
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm h-fit">
             <div className="flex items-center gap-3 border-b border-slate-100 pb-4 mb-6">
-              <PlusCircle className="text-sky-600" size={20} />
-              <h3 className="text-base font-black text-slate-800 uppercase tracking-tight">Nouvelle Dépense / Décaissement</h3>
+              <Landmark className="text-sky-600" size={20} />
+              <h3 className="text-base font-black text-slate-800 uppercase tracking-tight">Flux de Trésorerie Banque</h3>
             </div>
-            <form onSubmit={handleAddTransaction} className="space-y-4">
+            <form onSubmit={handleBankTransferSubmit} className="space-y-4">
               <div>
-                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-2">Nature de l'Opération</label>
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-2">Nature du flux</label>
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setTxType('DECAISSEMENT')}
-                    className={`flex-1 py-2.5 rounded font-black text-[10px] uppercase tracking-wider border-2 transition-all ${txType === 'DECAISSEMENT'
+                    onClick={() => setBankTxType('TRANSFERT_BANQUE')}
+                    className={`flex-1 py-2.5 rounded font-black text-[10px] uppercase tracking-wider border-2 transition-all ${bankTxType === 'TRANSFERT_BANQUE'
                       ? 'bg-rose-50 border-rose-500 text-rose-700'
                       : 'border-slate-200 text-slate-500 hover:bg-slate-50'
                       }`}
                   >
-                    Décaissement (Dépense)
+                    Transfert (Caisse &rarr; Banque)
                   </button>
                   <button
                     type="button"
-                    onClick={() => setTxType('ENCAISSEMENT')}
-                    className={`flex-1 py-2.5 rounded font-black text-[10px] uppercase tracking-wider border-2 transition-all ${txType === 'ENCAISSEMENT'
+                    onClick={() => setBankTxType('APPROVISIONNEMENT_BANQUE')}
+                    className={`flex-1 py-2.5 rounded font-black text-[10px] uppercase tracking-wider border-2 transition-all ${bankTxType === 'APPROVISIONNEMENT_BANQUE'
                       ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
                       : 'border-slate-200 text-slate-500 hover:bg-slate-50'
                       }`}
                   >
-                    Encaissement Direct
+                    Approvisionnement (Banque &rarr; Caisse)
                   </button>
                 </div>
               </div>
+
               <div>
-                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-2">Montant (FCFA)</label>
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-2">Compte Bancaire de Règlement *</label>
+                <select
+                  value={selectedBankAccountIdForTransfer}
+                  onChange={e => setSelectedBankAccountIdForTransfer(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg p-2.5 text-xs font-bold bg-slate-50 outline-none focus:border-sky-500 text-slate-800 shadow-sm cursor-pointer"
+                  required
+                >
+                  <option value="">Sélectionnez le compte bancaire</option>
+                  {bankAccounts
+                    .filter(acc => acc.type === 'VIREMENT_BANCAIRE')
+                    .map(acc => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.bankName} - {acc.accountNumber} ({acc.name})
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-2">Montant de l'opération (FCFA) *</label>
                 <input
                   type="number"
                   min="0"
-                  value={txAmount}
-                  onChange={e => setTxAmount(e.target.value)}
-                  placeholder="Ex: 10000"
+                  value={bankTxAmount}
+                  onChange={e => setBankTxAmount(e.target.value)}
+                  placeholder="Ex: 50000"
                   className="w-full border-2 border-slate-200 rounded-lg p-3 text-sm font-bold bg-slate-50 outline-none focus:border-sky-500"
+                  required
                 />
               </div>
+
               <div>
-                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-2">Libellé / Justification de l'opération</label>
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-2">Motif / Justification *</label>
                 <input
                   type="text"
-                  value={txLabel}
-                  onChange={e => setTxLabel(e.target.value)}
-                  placeholder="Ex: Achat rame de papier, Remboursement..."
+                  value={bankTxLabel}
+                  onChange={e => setBankTxLabel(e.target.value)}
+                  placeholder="Ex: Dépôt d'espèces à la banque..."
                   className="w-full border-2 border-slate-200 rounded-lg p-3 text-sm font-bold bg-slate-50 outline-none focus:border-sky-500"
+                  required
                 />
               </div>
+
               <button
                 type="submit"
-                disabled={savingTx || !activeSession}
+                disabled={savingBankTx || !activeSession}
                 className="w-full bg-sky-600 hover:bg-sky-700 disabled:bg-slate-200 disabled:text-slate-400 text-white p-3.5 rounded-lg text-[11px] font-black uppercase tracking-widest shadow-lg transition-colors flex items-center justify-center gap-2"
               >
-                {savingTx ? <RefreshCw className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
-                Enregistrer l'opération
+                {savingBankTx ? <RefreshCw className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
+                Soumettre au Manager
               </button>
             </form>
           </div>
 
-          {/* List of disbursements */}
+          {/* List of transfers */}
           <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
             <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
-              <ArrowDownRight size={18} className="text-rose-600" />
-              <span className="font-bold text-slate-700">Décaissements / Dépenses de la Session en Cours</span>
+              <Landmark size={18} className="text-sky-600" />
+              <span className="font-bold text-slate-700">Flux Banque en cours dans la Session</span>
             </div>
 
             <div className="overflow-x-auto">
@@ -1410,25 +1785,69 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
                 <div className="p-10 flex justify-center items-center">
                   <RefreshCw size={24} className="text-sky-600 animate-spin" />
                 </div>
-              ) : transactions.filter(t => t.type === 'DECAISSEMENT').length === 0 ? (
-                <div className="p-10 text-center text-slate-500 italic text-xs">Aucun décaissement enregistré dans cette session.</div>
+              ) : transactions.filter(t => t.expenseCategory === 'TRANSFERT_BANQUE' || t.expenseCategory === 'APPROVISIONNEMENT_BANQUE').length === 0 ? (
+                <div className="p-10 text-center text-slate-500 italic text-xs">Aucune transaction bancaire initiée dans cette session.</div>
               ) : (
                 <table className="w-full text-left text-[13px]">
                   <thead className="bg-[#0f172a] text-white">
                     <tr>
-                      <th className="p-3 px-4 font-black text-[10px] uppercase tracking-widest">Date / Heure</th>
-                      <th className="p-3 px-4 font-black text-[10px] uppercase tracking-widest">Libellé de l'Opération</th>
-                      <th className="p-3 px-4 font-black text-[10px] uppercase tracking-widest text-right">Montant Décaissement</th>
+                      <th className="p-3 px-4 font-black text-[10px] uppercase tracking-widest">Type</th>
+                      <th className="p-3 px-4 font-black text-[10px] uppercase tracking-widest">Compte bancaire / Motif</th>
+                      <th className="p-3 px-4 font-black text-[10px] uppercase tracking-widest text-right">Montant</th>
+                      <th className="p-3 px-4 font-black text-[10px] uppercase tracking-widest text-center">Statut</th>
+                      <th className="p-3 px-4 font-black text-[10px] uppercase tracking-widest text-center">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {transactions.filter(t => t.type === 'DECAISSEMENT').map(t => (
-                      <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-3 px-4 font-bold text-slate-500">{new Date(t.createdAt).toLocaleString()}</td>
-                        <td className="p-3 px-4 font-black text-slate-700">{t.label}</td>
-                        <td className="p-3 px-4 text-right font-black text-rose-600 bg-rose-50/10">-{formatCurrency(t.amount)} FCFA</td>
-                      </tr>
-                    ))}
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {transactions
+                      .filter(t => t.expenseCategory === 'TRANSFERT_BANQUE' || t.expenseCategory === 'APPROVISIONNEMENT_BANQUE')
+                      .map(t => {
+                        const isTransfer = t.expenseCategory === 'TRANSFERT_BANQUE';
+                        const bankAcc = bankAccounts.find(a => a.id === t.bankAccountCode);
+                        return (
+                          <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="p-3 px-4">
+                              <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${
+                                isTransfer ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+                              }`}>
+                                {isTransfer ? 'Transfert' : 'Approvisionnement'}
+                              </span>
+                            </td>
+                            <td className="p-3 px-4">
+                              <div className="font-black text-slate-700">{t.label}</div>
+                              <div className="text-[10px] text-slate-400 font-mono">
+                                Compte : {bankAcc ? `${bankAcc.bankName} - ${bankAcc.accountNumber}` : t.bankAccountCode}
+                              </div>
+                            </td>
+                            <td className={`p-3 px-4 text-right font-black ${isTransfer ? 'text-rose-600' : 'text-emerald-600'}`}>
+                              {isTransfer ? '-' : '+'}{formatCurrency(t.amount)} FCFA
+                            </td>
+                            <td className="p-3 px-4 text-center">
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${
+                                t.status === 'VALIDATED'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : t.status === 'CANCELLED'
+                                  ? 'bg-rose-100 text-rose-700'
+                                  : 'bg-amber-100 text-amber-700'
+                              }`}>
+                                {t.status === 'VALIDATED' ? 'Validé' : t.status === 'CANCELLED' ? 'Annulé' : 'En attente'}
+                              </span>
+                            </td>
+                            <td className="p-3 px-4 text-center">
+                              {t.status === 'PENDING' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCancelBankTransfer(t.id)}
+                                  className="text-rose-600 hover:text-rose-800 p-1.5 rounded transition-colors inline-block"
+                                  title="Annuler la demande"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
               )}
@@ -1474,51 +1893,52 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
                 </div>
               </div>
 
-              {/* Moyen de Paiement */}
+              {/* Choix du compte de règlement */}
               <div>
-                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-2">Moyen de Règlement</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { key: 'ESPECES', label: 'Espèces / Cash' },
-                    { key: 'CARTE', label: 'Carte Bancaire' },
-                    { key: 'CHEQUE', label: 'Chèque Banque' },
-                    { key: 'MOBILE_MONEY', label: 'Mobile Money' }
-                  ].map(method => (
-                    <button
-                      key={method.key}
-                      type="button"
-                      onClick={() => setMoyenPaiement(method.key)}
-                      className={`p-3 rounded-lg border-2 text-[10px] font-black uppercase tracking-wider text-center transition-all ${moyenPaiement === method.key
-                        ? 'border-sky-500 bg-sky-50 text-sky-700'
-                        : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                        }`}
-                    >
-                      {method.label}
-                    </button>
-                  ))}
-                </div>
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-2">Compte de Règlement *</label>
+                <select
+                  value={selectedSettlementAccount?.id || ''}
+                  onChange={e => {
+                    const acc = bankAccounts.find(a => a.id === e.target.value);
+                    setSelectedSettlementAccount(acc || null);
+                    if (acc) {
+                      setMoyenPaiement(acc.type);
+                      setSelectedBankAccount(acc.id);
+                    } else {
+                      setMoyenPaiement('ESPECES');
+                      setSelectedBankAccount('');
+                    }
+                  }}
+                  className="w-full border border-slate-300 rounded-lg p-2.5 text-xs font-bold bg-white outline-none focus:border-sky-500 text-slate-800 shadow-sm cursor-pointer"
+                  required
+                >
+                  {bankAccounts
+                    .filter(acc => {
+                      if (acc.type === 'ESPECES') {
+                        return (acc.eligibleCaisseCodes || []).includes(activeSession?.caisseCode);
+                      }
+                      return true;
+                    })
+                    .map(acc => {
+                      let labelText = '';
+                      if (acc.type === 'ESPECES') {
+                        labelText = `${acc.name || 'Espèces'} (Caisses: ${(acc.eligibleCaisseCodes || []).join(', ')})`;
+                      } else if (acc.type === 'MOBILE_MONEY') {
+                        labelText = `${acc.name || 'Mobile Money'} (${acc.providerName} - ${acc.phoneNumber})`;
+                      } else {
+                        labelText = `${acc.name || 'Virement'} (${acc.bankName} - ${acc.accountNumber})`;
+                      }
+                      return (
+                        <option key={acc.id} value={acc.id}>
+                          {labelText} {acc.primary ? ' [Principal]' : ''}
+                        </option>
+                      );
+                    })}
+                  {bankAccounts.length === 0 && (
+                    <option value="">Espèces (Session en cours)</option>
+                  )}
+                </select>
               </div>
-
-              {/* Choix du compte bancaire pour les paiements hors espèces */}
-              {moyenPaiement !== 'ESPECES' && bankAccounts.length > 0 && (
-                <div className="animate-in fade-in slide-in-from-top-2 duration-250 bg-slate-50 border border-slate-200/60 rounded-xl p-4 space-y-2">
-                  <label className="text-[10px] text-slate-600 font-black uppercase tracking-wider block">
-                    Compte Bancaire Destinataire
-                  </label>
-                  <select
-                    value={selectedBankAccount}
-                    onChange={e => setSelectedBankAccount(e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg p-2.5 text-xs font-bold bg-white outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-slate-800 shadow-sm"
-                    required
-                  >
-                    {bankAccounts.map(account => (
-                      <option key={account.code} value={account.code}>
-                        {account.string1} ({account.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
 
               {/* Montant Reçu & Change Return Calculation */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1562,6 +1982,72 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Refund Modal Dialog */}
+      {selectedRefund && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
+            <div className="bg-slate-900 p-5 text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-widest text-rose-400">Finaliser le Remboursement</h3>
+                <p className="text-[11px] text-slate-300 font-bold mt-1">Facture Réf : <span className="font-mono">{selectedRefund.invoiceRef}</span></p>
+              </div>
+              <button onClick={() => setSelectedRefund(null)} className="text-slate-400 hover:text-white transition-colors">
+                <XCircle size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/50 space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500 font-medium">Patient :</span>
+                  <span className="font-black text-slate-800">{selectedRefund.patientName}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500 font-medium">Acte Médical :</span>
+                  <span className="font-bold text-slate-700">{selectedRefund.actName}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500 font-medium">Demandé par :</span>
+                  <span className="font-medium text-slate-700">{selectedRefund.requestedBy}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500 font-medium">Motif :</span>
+                  <span className="italic text-slate-600">{selectedRefund.reason}</span>
+                </div>
+                <div className="border-t border-slate-200 pt-2 flex justify-between items-center">
+                  <span className="text-slate-500 font-bold text-xs uppercase">Montant à rembourser :</span>
+                  <span className="text-base font-black text-rose-600 font-mono">{formatCurrency(selectedRefund.refundAmount)} FCFA</span>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg text-xs font-semibold flex items-start gap-2">
+                <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                <span>
+                  La validation de ce remboursement enregistrera automatiquement un décaissement (dépense) de {formatCurrency(selectedRefund.refundAmount)} FCFA dans votre session de caisse active. Assurez-vous d'avoir le solde physique nécessaire.
+                </span>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => handleRejectRefund(selectedRefund.id)}
+                  disabled={processingRefund}
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 font-black uppercase text-[10px] tracking-wider rounded-lg transition-colors border border-slate-300"
+                >
+                  Rejeter la demande
+                </button>
+                <button
+                  onClick={() => handleApproveRefund(selectedRefund.id)}
+                  disabled={processingRefund}
+                  className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-black uppercase text-[10px] tracking-wider rounded-lg shadow-lg shadow-rose-600/10 transition-colors flex items-center justify-center gap-1.5"
+                >
+                  {processingRefund ? <RefreshCw className="animate-spin" size={14} /> : <Check size={14} />}
+                  Valider le Remboursement
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

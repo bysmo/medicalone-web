@@ -34,7 +34,7 @@ import java.util.UUID;
 @Tag(name = "Actes Médicaux", description = "Gestion du catalogue d'actes médicaux")
 public class MedicalActController {
 
-    private static final int MIN_MEDICAL_ACTS = 10;
+    private static final int MIN_MEDICAL_ACTS = 100;
     private static final int MIN_INSURANCES = 10;
 
     private final MedicalActRepository medicalActRepository;
@@ -260,7 +260,117 @@ public class MedicalActController {
             act(clinicId,"LABO_004","Créatinine",        ActNature.EXAMENS,"LABORATOIRE",true,"BIOCHIMIE"),
             act(clinicId,"LABO_005","NFS",               ActNature.EXAMENS,"LABORATOIRE",true,"HEMATOLOGIE"),
             act(clinicId,"LABO_006","ECBU",              ActNature.EXAMENS,"LABORATOIRE",true,"MICROBIOLOGIE"),
-            act(clinicId,"LABO_007","CRP",               ActNature.EXAMENS,"LABORATOIRE",true,"HEMATOLOGIE")
+            act(clinicId,"LABO_007","CRP",               ActNature.EXAMENS,"LABORATOIRE",true,"HEMATOLOGIE"),
+
+            // Échographies
+            act(clinicId,"ECHO_001","Échographie Abdominale", ActNature.EXAMENS,"ECHOGRAPHIE",false,null),
+            act(clinicId,"ECHO_002","Échographie Pelvienne", ActNature.EXAMENS,"ECHOGRAPHIE",false,null),
+            act(clinicId,"ECHO_003","Échographie Abdomino-pelvienne", ActNature.EXAMENS,"ECHOGRAPHIE",false,null),
+            act(clinicId,"ECHO_004","Échographie de datation", ActNature.EXAMENS,"ECHOGRAPHIE",false,null),
+            act(clinicId,"ECHO_005","Échographie de suivi", ActNature.EXAMENS,"ECHOGRAPHIE",false,null),
+            act(clinicId,"ECHO_006","Échographie du col de l'utérus", ActNature.EXAMENS,"ECHOGRAPHIE",false,null),
+            act(clinicId,"ECHO_007","Doppler cervical / TSA", ActNature.EXAMENS,"ECHOGRAPHIE",false,null),
+            act(clinicId,"ECHO_008","Doppler des membres", ActNature.EXAMENS,"ECHOGRAPHIE",false,null),
+            act(clinicId,"ECHO_009","Échographie rénale / vésicale", ActNature.EXAMENS,"ECHOGRAPHIE",false,null),
+            act(clinicId,"ECHO_010","Échographie Cervicale / Thyroïdienne", ActNature.EXAMENS,"ECHOGRAPHIE",false,null),
+            act(clinicId,"ECHO_011","Échographie Musculo-tendineuse", ActNature.EXAMENS,"ECHOGRAPHIE",false,null),
+            act(clinicId,"ECHO_012","Échographie des Parties molles et glandes salivaires", ActNature.EXAMENS,"ECHOGRAPHIE",false,null),
+
+            // Radiographies
+            // Cou et Thorax
+            act(clinicId,"RADIO_001","Laryngographie-pharyngographie", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_002","Radiographie du thorax y compris médiastin et cœur (Face)", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_003","Radiographie du thorax y compris médiastin et cœur (Face + Profil)", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_004","Examen radiologique des poumons avec opacification bronchique", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_005","Radiographie du thorax pour suivi post opératoire d'une intervention thoracique chez un patient hospitalisé", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            // Tube Digestif
+            act(clinicId,"RADIO_006","Abdomen sans préparation (face)", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_007","Abdomen sans préparation (face) + autres incidences quel que soit le nombre", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_008","Abdomen aigu (syndrome occlusif ou péritonéal, ASP debout, couché + RX thorax)", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_009","Transit Oesophagien", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_010","Transit Oeso-gastro-duodénal (avec scopie télévisée pour 2 régions)", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_011","Examen radiologique du colon", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_012","Transit du grêle", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_013","Defecographie", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_014","Fistulographie (Face + Profil) sans tenir compte de l'injection", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_015","Cholangiographie par le drain", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            // Membre supérieur
+            act(clinicId,"RADIO_016","Membre Supérieur Entier - 2 Incidences", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_017","Epaule Face", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_018","Epaule Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_019","Clavicule", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_020","Omoplate Face", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_021","Omoplate Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_022","Humérus Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_023","Coude Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_024","Avant-bras Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_025","Poignet Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_026","Main Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_027","Doigt Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_028","Scaphoïde (2 incidences)", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_029","Main Face/Profil + Scaphoïde", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            // Membre inférieur
+            act(clinicId,"RADIO_030","Bassin, hanche, articulations sacro-iliaques", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_031","Hanche Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_032","Hanche + 2 x 3/4", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_033","Fémur Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_034","Genou Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_035","Jambe Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_036","Pied Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_037","Talon Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_038","Cheville Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_039","Orteil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_040","Axiales 2 genoux 2 incidences", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_041","Gonométrie (Règle de Bell Thomson) Adultes", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_042","Gonométrie (Règle de Bell Thomson) Enfants", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_043","Radiomensuration comparative des membres", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            // Tête
+            act(clinicId,"RADIO_044","Maxillaire défilé, os propres du nez", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_045","Dent par technique intrabuccale, film occlusal ou rétro-alvéolaire", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_046","Radiographie panoramique de la totalité du système maxillaire et du système dentaire", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_047","Téléradiographie du crâne à trois mètres (diagnostic orthodontique), par séance", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_048","Articulation Temporo-Maxillaire (1 côté)", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_049","Articulation Temporo-Maxillaire (2 côtés)", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_050","Cavum", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_051","Larynx Face ou Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_052","Larynx Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            // Thorax
+            act(clinicId,"RADIO_053","Gril costal, ou sternum, ou hémithorax, ou articulation sterno-claviculaire (Une incidence)", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_054","Gril costal, ou sternum, ou hémithorax, ou articulation sterno-claviculaire (Par incidence supplémentaire)", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            // Rachis
+            act(clinicId,"RADIO_055","Rachis dans son entier en téléradiographie à 2,50 mètres par examen", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_056","Rachis Cervical Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_057","Rachis Cervical Face + Profil + 2 x 3/4", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_058","Rachis Cervical Face + Profil + dynamique", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_059","Rachis Dorsal Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_060","Rachis lombaire Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_061","Rachis entier Enfant", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_062","Sacrum Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_063","Charnière cervico-occipitale Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_064","Rachis lombaire Face + Profil + L5-S1 Face + Profil", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_065","Rachis lombaire Face + Profil + 3/4 droit+gauche", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_066","Rachis lombaire Face + Profil + Etude dynamique", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            // Gynécologie
+            act(clinicId,"RADIO_067","Mammographie unilatérale", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_068","Hystérosalpingographie sans l'injection", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_069","Radiopelvimétrie", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_070","Génitographie externe, colpocystographie sans l'injection", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_071","Contenu utérin", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_072","Galactographie sans l'injection", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            // Système nerveux
+            act(clinicId,"RADIO_073","Myélographie", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_074","Discographie d'un ou plusieurs disques", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_075","Sacco-radiculographie", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            // Angiographie numérisée
+            act(clinicId,"RADIO_076","Examen cranien (4 axes)", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_077","Examen cranien (sélectif)", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_078","Examen viscéral (global)", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_079","Examen viscéral (sélectif)", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_080","Examen périphérique (global)", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_081","Examen périphérique (sélectif)", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_082","Phlébographie (1 membre)", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_083","Phlébographie (2 membres)", ActNature.EXAMENS,"RADIOGRAPHIE",false,null),
+            act(clinicId,"RADIO_084","Cavographie", ActNature.EXAMENS,"RADIOGRAPHIE",false,null)
         );
     }
 
@@ -288,6 +398,38 @@ public class MedicalActController {
     }
 
     private BigDecimal getBasePriceForAct(String code) {
+        if (code.startsWith("ECHO_")) {
+            if (code.contains("007") || code.contains("008")) { // Dopplers
+                return new BigDecimal("25000");
+            }
+            if (code.contains("003")) { // Abdomino-pelvienne
+                return new BigDecimal("20000");
+            }
+            if (code.contains("004")) { // Datation
+                return new BigDecimal("10000");
+            }
+            return new BigDecimal("15000");
+        }
+        if (code.startsWith("RADIO_")) {
+            // Complex procedures
+            if (code.equals("RADIO_073") || code.equals("RADIO_074") || code.equals("RADIO_075") || 
+                code.equals("RADIO_078") || code.equals("RADIO_079") || code.equals("RADIO_081") || code.equals("RADIO_083")) {
+                return new BigDecimal("35000");
+            }
+            if (code.equals("RADIO_010") || code.equals("RADIO_013") || code.equals("RADIO_041") || 
+                code.equals("RADIO_047") || code.equals("RADIO_055") || code.equals("RADIO_068") || 
+                code.equals("RADIO_070") || code.equals("RADIO_076") || code.equals("RADIO_077") || 
+                code.equals("RADIO_080") || code.equals("RADIO_084")) {
+                return new BigDecimal("25000");
+            }
+            // Simple / Face only
+            if (code.equals("RADIO_002") || code.equals("RADIO_006") || code.equals("RADIO_017") || 
+                code.equals("RADIO_019") || code.equals("RADIO_020") || code.equals("RADIO_027") || 
+                code.equals("RADIO_039") || code.equals("RADIO_045") || code.equals("RADIO_054")) {
+                return new BigDecimal("10000");
+            }
+            return new BigDecimal("15000");
+        }
         switch (code) {
             case "CONSULT_001": return new BigDecimal("10000");
             case "CONSULT_002": return new BigDecimal("15000");

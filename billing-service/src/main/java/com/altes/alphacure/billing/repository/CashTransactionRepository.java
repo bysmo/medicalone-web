@@ -15,4 +15,10 @@ public interface CashTransactionRepository extends JpaRepository<CashTransaction
     List<CashTransaction> findBySessionIdOrderByCreatedAtDesc(UUID sessionId);
 
     List<CashTransaction> findByClinicId(UUID clinicId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT SUM(t.amount) FROM CashTransaction t WHERE t.sessionId IN :sessionIds " +
+           "AND t.type = :type AND t.status = 'VALIDATED'")
+    java.math.BigDecimal sumTransactionAmountBySessionsAndType(
+            @org.springframework.data.repository.query.Param("sessionIds") List<UUID> sessionIds,
+            @org.springframework.data.repository.query.Param("type") String type);
 }

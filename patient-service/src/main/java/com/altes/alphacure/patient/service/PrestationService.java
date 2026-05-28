@@ -30,6 +30,7 @@ public class PrestationService {
     private final com.altes.alphacure.patient.client.BillingClient billingClient;
     private final jakarta.servlet.http.HttpServletRequest request;
     private final InvoiceService invoiceService;
+    private final PatientRepository patientRepository;
 
     // --- Prestations (InvoiceLines) ---
 
@@ -227,6 +228,42 @@ public class PrestationService {
     @Transactional(readOnly = true)
     public List<CancellationRequest> getPendingCancellations() {
         return cancellationRequestRepository.findByValidationStatusOrderByRequestedAtDesc(ValidationStatus.PENDING);
+    }
+
+    @Transactional(readOnly = true)
+    public List<java.util.Map<String, Object>> getPendingCancellationsWithDetails(UUID clinicId) {
+        List<CancellationRequest> requests = cancellationRequestRepository.findByValidationStatusOrderByRequestedAtDesc(ValidationStatus.PENDING);
+        List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+        for (CancellationRequest req : requests) {
+            InvoiceLine line = invoiceLineRepository.findById(req.getInvoiceLineId()).orElse(null);
+            if (line == null) continue;
+            
+            Invoice invoice = invoiceRepository.findById(line.getInvoiceId()).orElse(null);
+            if (invoice == null) continue;
+            
+            if (clinicId != null && !clinicId.equals(invoice.getClinicId())) {
+                continue;
+            }
+            
+            Patient patient = patientRepository.findById(invoice.getPatientId()).orElse(null);
+            
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            map.put("id", req.getId());
+            map.put("invoiceLineId", req.getInvoiceLineId());
+            map.put("type", req.getType());
+            map.put("reason", req.getReason());
+            map.put("requestedBy", req.getRequestedBy());
+            map.put("requestedAt", req.getRequestedAt());
+            map.put("refundAmount", req.getRefundAmount());
+            map.put("validationStatus", req.getValidationStatus());
+            
+            map.put("actName", line.getActName());
+            map.put("patientName", patient != null ? (patient.getFirstName() + " " + patient.getLastName()) : "Patient inconnu");
+            map.put("invoiceRef", invoice.getInvoiceRef());
+            
+            result.add(map);
+        }
+        return result;
     }
 
     @Transactional(readOnly = true)

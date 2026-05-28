@@ -145,6 +145,7 @@ export const cashSessionService = {
   open: (data) => api.post('/api/v1/cash-sessions/open', data),
   close: (id, data) => api.post(`/api/v1/cash-sessions/close/${id}`, data),
   getTransactions: (id) => api.get(`/api/v1/cash-sessions/${id}/transactions`),
+  getAllTransactions: (bankAccountCode = '', status = '') => api.get(`/api/v1/cash-sessions/transactions?bankAccountCode=${bankAccountCode}&status=${status}`),
   addTransaction: (data) => api.post('/api/v1/cash-sessions/transaction', data),
   getAll: () => api.get('/api/v1/cash-sessions'),
   payInvoice: (invoiceId, data) => api.post(`/api/v1/invoices/${invoiceId}/pay`, data),
@@ -185,6 +186,7 @@ export const medicalService = {
   endConsultation: (id) => api.put(`/api/v1/medical/consultations/${id}/end`),
   getPatientHistory: (patientId) => api.get(`/api/v1/medical/patients/${patientId}/history`),
   getSeancesConsultations: () => api.get('/api/v1/medical/consultations/seances'),
+  getAllConsultations: () => api.get('/api/v1/medical/consultations'),
   assignConsultation: (id, practitionerId) => api.put(`/api/v1/medical/consultations/${id}/assign?practitionerId=${practitionerId}`),
   deleteConsultation: (id) => api.delete(`/api/v1/medical/consultations/${id}`),
 
@@ -221,6 +223,15 @@ export const medicalService = {
   getDicomFilesByConsultation: (consultationId) => api.get(`/api/v1/medical/dicom/consultation/${consultationId}`),
   getDicomFilesByPatient: (patientId) => api.get(`/api/v1/medical/dicom/patient/${patientId}`),
   deleteDicom: (id) => api.delete(`/api/v1/medical/dicom/${id}`),
+};
+
+export const staffRemunerationService = {
+  getStaffList: (month, roleFilter = 'ALL', contractFilter = 'ALL') =>
+    api.get(`/api/v1/staff-remunerations/staff?month=${month}&roleFilter=${roleFilter}&contractFilter=${contractFilter}`),
+  getStaffPrestations: (staffId, month) =>
+    api.get(`/api/v1/staff-remunerations/staff/${staffId}/prestations?month=${month}`),
+  saveRemuneration: (payload) =>
+    api.post('/api/v1/staff-remunerations/save', payload),
 };
 
 export default api;

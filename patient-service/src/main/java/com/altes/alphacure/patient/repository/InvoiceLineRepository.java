@@ -28,6 +28,24 @@ public interface InvoiceLineRepository extends JpaRepository<InvoiceLine, UUID> 
     @Query("SELECT COUNT(il) FROM InvoiceLine il WHERE il.practitionerId = :practitionerId AND il.status = :status")
     long countByPractitionerIdAndStatus(UUID practitionerId, InvoiceLineStatus status);
 
+    @Query("SELECT il FROM InvoiceLine il JOIN Invoice i ON il.invoiceId = i.id " +
+           "WHERE i.clinicId = :clinicId AND il.practitionerId = :practitionerId " +
+           "AND il.createdAt >= :start AND il.createdAt < :end ORDER BY il.createdAt DESC")
+    List<InvoiceLine> findByPractitionerAndMonth(
+            @org.springframework.data.repository.query.Param("clinicId") UUID clinicId,
+            @org.springframework.data.repository.query.Param("practitionerId") UUID practitionerId,
+            @org.springframework.data.repository.query.Param("start") LocalDateTime start,
+            @org.springframework.data.repository.query.Param("end") LocalDateTime end);
+
     List<InvoiceLine> findByPatientIdOrderByCreatedAtDesc(UUID patientId);
     List<InvoiceLine> findByPatientIdAndStatusOrderByCreatedAtDesc(UUID patientId, InvoiceLineStatus status);
+
+    @Query("SELECT COUNT(il) FROM InvoiceLine il JOIN Invoice i ON il.invoiceId = i.id " +
+           "WHERE i.clinicId = :clinicId AND il.createdBy = :createdBy " +
+           "AND il.createdAt >= :start AND il.createdAt < :end")
+    long countRegisteredPrestations(
+            @org.springframework.data.repository.query.Param("clinicId") UUID clinicId,
+            @org.springframework.data.repository.query.Param("createdBy") String createdBy,
+            @org.springframework.data.repository.query.Param("start") LocalDateTime start,
+            @org.springframework.data.repository.query.Param("end") LocalDateTime end);
 }

@@ -65,6 +65,9 @@ public class InvoiceLine {
     @Column(name = "practitioner_id")
     private UUID practitionerId;
 
+    @Column(name = "created_by", length = 100)
+    private String createdBy;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

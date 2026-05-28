@@ -124,31 +124,38 @@ public class PrestationController {
     }
 
     // --- Cancellation Validation ---
-
+ 
     @GetMapping("/cancellations/pending")
-    @PreAuthorize("hasAnyRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER_CLINIQUE', 'CAISSIER')")
     @Operation(summary = "Lister les demandes d'annulation en attente de validation")
-    public ResponseEntity<List<CancellationRequest>> getPendingCancellations() {
-        return ResponseEntity.ok(prestationService.getPendingCancellations());
+    public ResponseEntity<List<Map<String, Object>>> getPendingCancellations() {
+        UUID clinicId = clinicContextHolder.getClinicId();
+        return ResponseEntity.ok(prestationService.getPendingCancellationsWithDetails(clinicId));
     }
-
+ 
     @PostMapping("/cancellations/{id}/approve")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER_CLINIQUE', 'CAISSIER')")
     @Operation(summary = "Valider un remboursement")
     public ResponseEntity<CancellationRequest> approveRefund(
             @PathVariable UUID id,
             @RequestBody Map<String, String> body) {
-        String validatedBy = body.getOrDefault("validatedBy", "admin");
+        String validatedBy = clinicContextHolder.getUsername();
+        if (validatedBy == null || validatedBy.isBlank()) {
+            validatedBy = body.getOrDefault("validatedBy", "admin");
+        }
         return ResponseEntity.ok(prestationService.approveRefund(id, validatedBy));
     }
-
+ 
     @PostMapping("/cancellations/{id}/reject")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER_CLINIQUE', 'CAISSIER')")
     @Operation(summary = "Rejeter un remboursement")
     public ResponseEntity<CancellationRequest> rejectRefund(
             @PathVariable UUID id,
             @RequestBody Map<String, String> body) {
-        String validatedBy = body.getOrDefault("validatedBy", "admin");
+        String validatedBy = clinicContextHolder.getUsername();
+        if (validatedBy == null || validatedBy.isBlank()) {
+            validatedBy = body.getOrDefault("validatedBy", "admin");
+        }
         return ResponseEntity.ok(prestationService.rejectRefund(id, validatedBy));
     }
 }

@@ -166,6 +166,11 @@ public class MedicalConsultationService {
         return consultationRepository.findByClinicIdAndNature(clinicId, "SEANCES");
     }
 
+    @Transactional(readOnly = true)
+    public List<Consultation> getAllConsultations(UUID clinicId) {
+        return consultationRepository.findByClinicId(clinicId);
+    }
+
     public Consultation assignPractitioner(UUID consultationId, UUID practitionerId, UUID clinicId) {
         Consultation consultation = consultationRepository.findById(consultationId)
                 .orElseThrow(() -> new RuntimeException("Consultation introuvable: " + consultationId));

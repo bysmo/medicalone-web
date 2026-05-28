@@ -170,6 +170,13 @@ public class MedicalConsultationController {
         return ResponseEntity.ok(consultationService.getSeancesConsultations(clinicId));
     }
 
+    @GetMapping("/consultations")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MEDECIN', 'INFIRMIER', 'RECEPTIONNISTE', 'CAISSIER', 'COMPTABLE')")
+    public ResponseEntity<List<Consultation>> getAllConsultations() {
+        UUID clinicId = clinicContextHolder.getClinicId();
+        return ResponseEntity.ok(consultationService.getAllConsultations(clinicId));
+    }
+
     @PutMapping("/consultations/{id}/assign")
     @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONNISTE')")
     public ResponseEntity<Consultation> assignPractitioner(

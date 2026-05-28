@@ -3,13 +3,13 @@ import {
   Building2, Save, Loader2, Plus,
   Landmark, FileText, Printer, Globe
 } from 'lucide-react';
-import { clinicService } from '../../services/api';
+import { clinicService, nomenclatureService } from '../../services/api';
 import ImageUploadField from '../ui/ImageUploadField';
 import { notifyClinicBrandingUpdated } from '../../context/ClinicBrandingContext';
 
 const TABS = [
   { id: 'general', label: 'Général', icon: Building2 },
-  { id: 'bank', label: 'Comptes bancaires', icon: Landmark },
+  { id: 'bank', label: 'Comptes de règlement', icon: Landmark },
   { id: 'fiscal', label: 'Fiscal & juridique', icon: FileText },
   { id: 'print', label: 'Impressions A4/A5', icon: Printer },
   { id: 'web', label: 'Web & réseaux', icon: Globe },
@@ -20,14 +20,21 @@ const LEGAL_REGIMES = [
 ];
 
 const emptyBankAccount = () => ({
+  id: Math.random().toString(36).substring(2, 9),
+  name: '',
+  type: 'VIREMENT_BANCAIRE',
+  primary: false,
+  eligibleCaisseCodes: [],
+  providerName: '',
+  phoneNumber: '',
   bankName: '',
   accountHolder: '',
   accountNumber: '',
   iban: '',
   swift: '',
   branch: '',
-  primary: false,
 });
+
 
 const emptyForm = () => ({
   name: '',
@@ -74,10 +81,16 @@ const MaCliniqueView = ({ showToast }) => {
   const [saving, setSaving] = useState(false);
   const [clinicCode, setClinicCode] = useState('');
   const [form, setForm] = useState(emptyForm());
+  const [caisses, setCaisses] = useState([]);
+
   const load = async () => {
     setLoading(true);
     try {
-      const res = await clinicService.getMyProfile();
+      const [res, caissesRes] = await Promise.all([
+        clinicService.getMyProfile(),
+        nomenclatureService.search('CAISSES_TRESORERIE', 'FINANCES').catch(() => ({ data: [] }))
+      ]);
+      setCaisses(caissesRes.data || []);
       const { clinic, profile } = res.data || {};
       setClinicCode(clinic?.code || '');
       setForm({
@@ -105,7 +118,12 @@ const MaCliniqueView = ({ showToast }) => {
         fiscalYearEnd: profile?.fiscalYearEnd || '',
         fiscalNotes: profile?.fiscalNotes || '',
         bankAccounts: profile?.bankAccounts?.length
-          ? profile.bankAccounts
+          ? profile.bankAccounts.map(acc => ({
+              ...emptyBankAccount(),
+              ...acc,
+              id: acc.id || Math.random().toString(36).substring(2, 9),
+              type: acc.type || 'VIREMENT_BANCAIRE'
+            }))
           : [emptyBankAccount()],
         printHeaderA4: profile?.printHeaderA4 || '',
         printFooterA4: profile?.printFooterA4 || '',
@@ -127,6 +145,7 @@ const MaCliniqueView = ({ showToast }) => {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     load();
@@ -301,11 +320,11 @@ const MaCliniqueView = ({ showToast }) => {
         {activeSection === 'bank' && (
           <div className="space-y-4">
             {form.bankAccounts.map((acc, idx) => (
-              <div key={idx} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-black text-slate-600 uppercase">Compte {idx + 1}</span>
+              <div key={acc.id || idx} className="p-5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-4 shadow-inner animate-in fade-in duration-150">
+                <div className="flex justify-between items-center border-b border-slate-200/50 pb-2">
+                  <span className="text-xs font-black text-slate-700 uppercase">Compte de Règlement {idx + 1}</span>
                   <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-1 text-xs font-bold text-slate-600">
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={!!acc.primary}
@@ -314,46 +333,133 @@ const MaCliniqueView = ({ showToast }) => {
                       Principal
                     </label>
                     {form.bankAccounts.length > 1 && (
-                      <button type="button" onClick={() => removeBankAccount(idx)} className="text-rose-600 text-xs font-bold">
+                      <button type="button" onClick={() => removeBankAccount(idx)} className="text-rose-600 text-xs font-black uppercase hover:text-rose-700">
                         Supprimer
                       </button>
                     )}
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className={labelClass}>Banque</label>
-                    <input className={inputClass} value={acc.bankName || ''} onChange={(e) => updateBank(idx, 'bankName', e.target.value)} />
+                    <label className={labelClass}>Nom / Libellé du compte de règlement *</label>
+                    <input
+                      className={inputClass}
+                      value={acc.name || ''}
+                      onChange={(e) => updateBank(idx, 'name', e.target.value)}
+                      placeholder="Ex: Caisse Principale, Orange Money Clinique, BOA"
+                      required
+                    />
                   </div>
+
                   <div>
-                    <label className={labelClass}>Titulaire</label>
-                    <input className={inputClass} value={acc.accountHolder || ''} onChange={(e) => updateBank(idx, 'accountHolder', e.target.value)} />
-                  </div>
-                  <div>
-                    <label className={labelClass}>N° compte</label>
-                    <input className={inputClass} value={acc.accountNumber || ''} onChange={(e) => updateBank(idx, 'accountNumber', e.target.value)} />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Agence</label>
-                    <input className={inputClass} value={acc.branch || ''} onChange={(e) => updateBank(idx, 'branch', e.target.value)} />
-                  </div>
-                  <div>
-                    <label className={labelClass}>IBAN</label>
-                    <input className={inputClass} value={acc.iban || ''} onChange={(e) => updateBank(idx, 'iban', e.target.value)} />
-                  </div>
-                  <div>
-                    <label className={labelClass}>SWIFT / BIC</label>
-                    <input className={inputClass} value={acc.swift || ''} onChange={(e) => updateBank(idx, 'swift', e.target.value)} />
+                    <label className={labelClass}>Mode de règlement</label>
+                    <select
+                      className={inputClass}
+                      value={acc.type || 'VIREMENT_BANCAIRE'}
+                      onChange={(e) => updateBank(idx, 'type', e.target.value)}
+                    >
+                      <option value="ESPECES">Espèces (Caisses)</option>
+                      <option value="MOBILE_MONEY">Mobile Money</option>
+                      <option value="VIREMENT_BANCAIRE">Virement Bancaire</option>
+                    </select>
                   </div>
                 </div>
+
+                {acc.type === 'ESPECES' && (
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2 animate-in slide-in-from-top-1 duration-150">
+                    <label className={`${labelClass} mb-2`}>Caisses éligibles *</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {caisses.map(c => {
+                        const isChecked = (acc.eligibleCaisseCodes || []).includes(c.code);
+                        return (
+                          <label key={c.code} className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer p-2 bg-slate-50 border border-slate-100 rounded-lg hover:bg-slate-100 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                const currentCodes = acc.eligibleCaisseCodes || [];
+                                const newCodes = e.target.checked
+                                  ? [...currentCodes, c.code]
+                                  : currentCodes.filter(code => code !== c.code);
+                                updateBank(idx, 'eligibleCaisseCodes', newCodes);
+                              }}
+                            />
+                            <div>
+                              <span className="block font-bold">{c.string1}</span>
+                              <span className="text-[9px] text-slate-400 font-mono">{c.code}</span>
+                            </div>
+                          </label>
+                        );
+                      })}
+                      {caisses.length === 0 && (
+                        <p className="text-xs text-slate-400 italic col-span-2">Aucune caisse configurée dans la nomenclature</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {acc.type === 'MOBILE_MONEY' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white border border-slate-200 rounded-xl p-4 animate-in slide-in-from-top-1 duration-150">
+                    <div>
+                      <label className={labelClass}>Nom du Fournisseur *</label>
+                      <input
+                        className={inputClass}
+                        value={acc.providerName || ''}
+                        onChange={(e) => updateBank(idx, 'providerName', e.target.value)}
+                        placeholder="Ex: Orange Money, MTN MoMo, Wave"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Numéro de Téléphone *</label>
+                      <input
+                        className={inputClass}
+                        value={acc.phoneNumber || ''}
+                        onChange={(e) => updateBank(idx, 'phoneNumber', e.target.value)}
+                        placeholder="Ex: 77883344"
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {acc.type === 'VIREMENT_BANCAIRE' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-white border border-slate-200 rounded-xl p-4 animate-in slide-in-from-top-1 duration-150">
+                    <div>
+                      <label className={labelClass}>Banque</label>
+                      <input className={inputClass} value={acc.bankName || ''} onChange={(e) => updateBank(idx, 'bankName', e.target.value)} placeholder="Ex: BOA" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Titulaire</label>
+                      <input className={inputClass} value={acc.accountHolder || ''} onChange={(e) => updateBank(idx, 'accountHolder', e.target.value)} placeholder="Ex: Clinique CTE" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>N° compte</label>
+                      <input className={inputClass} value={acc.accountNumber || ''} onChange={(e) => updateBank(idx, 'accountNumber', e.target.value)} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Agence</label>
+                      <input className={inputClass} value={acc.branch || ''} onChange={(e) => updateBank(idx, 'branch', e.target.value)} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>IBAN</label>
+                      <input className={inputClass} value={acc.iban || ''} onChange={(e) => updateBank(idx, 'iban', e.target.value)} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>SWIFT / BIC</label>
+                      <input className={inputClass} value={acc.swift || ''} onChange={(e) => updateBank(idx, 'swift', e.target.value)} />
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
             <button
               type="button"
               onClick={addBankAccount}
-              className="flex items-center gap-2 text-xs font-bold text-sky-600 uppercase"
+              className="flex items-center gap-2 text-xs font-bold text-sky-600 uppercase hover:text-sky-700 mt-2"
             >
-              <Plus size={14} /> Ajouter un compte
+              <Plus size={14} /> Ajouter un compte de règlement
             </button>
           </div>
         )}
