@@ -1,15 +1,13 @@
 # ================================================================
 # AlphaCureClinic — Docker Compose PRODUCTION (Dokploy)
-# 
+#
 # ⚠️  NE PAS utiliser ce fichier directement avec 'docker compose up'
 #     Il est conçu pour être importé dans Dokploy via GitHub.
 #
-# Dans Dokploy :
-#   - Créer un Project "AlphaCure"
-#   - Ajouter un service de type "Docker Compose"
-#   - Pointer vers ce fichier (docker-compose.dokploy.yml)
-#   - Configurer les variables d'environnement dans l'UI Dokploy
-#   - Configurer les domaines dans l'onglet "Domains" de chaque service
+# Stratégie de build Java :
+#   - Contexte = RACINE du repo (pour accéder au pom.xml parent)
+#   - Dockerfile multi-stage Maven → JRE (pas de JAR pré-compilé requis)
+#   - SERVICE_DIR=<service> indique quel module compiler
 # ================================================================
 
 services:
@@ -32,7 +30,6 @@ services:
       retries: 10
     networks:
       - alphacure-network
-      - dokploy-network
 
   # --- Sécurité (Keycloak) ---
   keycloak:
@@ -64,10 +61,13 @@ services:
       - "traefik.http.services.keycloak.loadbalancer.server.port=8180"
 
   # --- Infrastructure ---
+  # Contexte = racine du repo, SERVICE_DIR pointe vers le sous-module
   discovery-service:
     build:
-      context: ./discovery-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: discovery-service/Dockerfile
+      args:
+        SERVICE_DIR: discovery-service
     container_name: alphacure-discovery
     restart: unless-stopped
     environment:
@@ -77,8 +77,10 @@ services:
 
   config-service:
     build:
-      context: ./config-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: config-service/Dockerfile
+      args:
+        SERVICE_DIR: config-service
     container_name: alphacure-config
     restart: unless-stopped
     environment:
@@ -127,8 +129,10 @@ services:
   # --- API Gateway (exposé publiquement via Traefik) ---
   gateway-service:
     build:
-      context: ./gateway-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: gateway-service/Dockerfile
+      args:
+        SERVICE_DIR: gateway-service
     container_name: gateway-service
     restart: unless-stopped
     environment:
@@ -151,7 +155,11 @@ services:
 
   # --- Microservices (réseau interne uniquement) ---
   patient-service:
-    build: ./patient-service
+    build:
+      context: .
+      dockerfile: patient-service/Dockerfile
+      args:
+        SERVICE_DIR: patient-service
     container_name: alphacure-patient
     restart: unless-stopped
     environment:
@@ -168,7 +176,11 @@ services:
       - alphacure-network
 
   billing-service:
-    build: ./billing-service
+    build:
+      context: .
+      dockerfile: billing-service/Dockerfile
+      args:
+        SERVICE_DIR: billing-service
     container_name: alphacure-billing
     restart: unless-stopped
     environment:
@@ -185,7 +197,11 @@ services:
       - alphacure-network
 
   identity-service:
-    build: ./identity-service
+    build:
+      context: .
+      dockerfile: identity-service/Dockerfile
+      args:
+        SERVICE_DIR: identity-service
     container_name: alphacure-identity
     restart: unless-stopped
     environment:
@@ -206,7 +222,11 @@ services:
       - alphacure-network
 
   clinic-service:
-    build: ./clinic-service
+    build:
+      context: .
+      dockerfile: clinic-service/Dockerfile
+      args:
+        SERVICE_DIR: clinic-service
     container_name: alphacure-clinic
     restart: unless-stopped
     environment:
@@ -223,7 +243,11 @@ services:
       - alphacure-network
 
   nomenclature-service:
-    build: ./nomenclature-service
+    build:
+      context: .
+      dockerfile: nomenclature-service/Dockerfile
+      args:
+        SERVICE_DIR: nomenclature-service
     container_name: alphacure-nomenclature
     restart: unless-stopped
     environment:
@@ -240,8 +264,96 @@ services:
       - alphacure-network
 
   medical-record-service:
-    build: ./medical-record-service
+    build:
+      context: .
+      dockerfile: medical-record-service/Dockerfile
+      args:
+        SERVICE_DIR: medical-record-service
     container_name: alphacure-medical-record
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
+      - DB_PASSWORD=${DB_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+    networks:
+      - alphacure-network
+
+  session-service:
+    build:
+      context: .
+      dockerfile: session-service/Dockerfile
+      args:
+        SERVICE_DIR: session-service
+    container_name: alphacure-session
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
+      - DB_PASSWORD=${DB_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+    networks:
+      - alphacure-network
+
+  staff-service:
+    build:
+      context: .
+      dockerfile: staff-service/Dockerfile
+      args:
+        SERVICE_DIR: staff-service
+    container_name: alphacure-staff
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
+      - DB_PASSWORD=${DB_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+    networks:
+      - alphacure-network
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
+      args:
+        SERVICE_DIR: payment-service
+    container_name: alphacure-payment
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
+      - DB_PASSWORD=${DB_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+    networks:
+      - alphacure-network
+
+  platform-admin-service:
+    build:
+      context: .
+      dockerfile: platform-admin-service/Dockerfile
+      args:
+        SERVICE_DIR: platform-admin-service
+    container_name: alphacure-platform-admin
     restart: unless-stopped
     environment:
       - SPRING_PROFILES_ACTIVE=docker

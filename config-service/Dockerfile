@@ -1,24 +1,48 @@
-# Dockerfile générique pour tous les microservices Spring Boot
-FROM eclipse-temurin:21-jre-alpine
+# ================================================================
+# Multi-stage build — Maven compile + JRE runtime
+# Contexte de build = RACINE du repo (pour accéder au pom.xml parent)
+# ================================================================
 
+# === STAGE 1 : Compilation Maven ===
+FROM maven:3.9-eclipse-temurin-21-alpine AS builder
+
+# ARG pour savoir quel sous-module compiler
+ARG SERVICE_DIR=.
+
+WORKDIR /build
+
+# 1. Copier le pom.xml parent (à la racine du contexte de build)
+COPY pom.xml ./pom.xml
+
+# 2. Copier le pom.xml du service concerné pour pré-télécharger les dépendances
+COPY ${SERVICE_DIR}/pom.xml ./${SERVICE_DIR}/pom.xml
+
+# 3. Pré-télécharger les dépendances (optimise le cache Docker)
+RUN mvn -pl ${SERVICE_DIR} dependency:go-offline -q 2>/dev/null || true
+
+# 4. Copier les sources du service
+COPY ${SERVICE_DIR}/src ./${SERVICE_DIR}/src
+
+# 5. Compiler uniquement ce service
+RUN mvn -pl ${SERVICE_DIR} package -DskipTests -am -q
+
+# === STAGE 2 : Runtime JRE minimal ===
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-# Utilisateur non-root pour la sécurité
+# Sécurité : utilisateur non-root
 RUN apk add --no-cache curl && \
     addgroup -S alphacure && adduser -S alphacure -G alphacure
 
-# Copie du JAR (utiliser le profil Maven pour construire)
-ARG JAR_FILE=target/*.jar
-COPY ${JAR_FILE} app.jar
-
-# Permissions
+ARG SERVICE_DIR=.
+# Copier le JAR compilé depuis le stage builder
+COPY --from=builder /build/${SERVICE_DIR}/target/*.jar app.jar
 RUN chown alphacure:alphacure app.jar
 USER alphacure
 
-# Port exposé (override via docker-compose ou K8s)
-EXPOSE 8080
+EXPOSE 8888
 
-# Options JVM pour production (Java 21 + containers)
+# Options JVM optimisées pour containers
 ENV JAVA_OPTS="-XX:+UseContainerSupport \
                -XX:MaxRAMPercentage=75.0 \
                -XX:+UseG1GC \
