@@ -44,7 +44,7 @@ services:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KC_HTTP_PORT: 8180
-      KC_HOSTNAME: kk.alphacure.com
+      KC_HOSTNAME: kk.alphacure.cloud
       KC_HOSTNAME_STRICT: "false"
       KC_PROXY: edge
       KC_HTTP_ENABLED: "true"
@@ -57,7 +57,7 @@ services:
       - dokploy-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.keycloak.rule=Host(`kk.alphacure.com`)"
+      - "traefik.http.routers.keycloak.rule=Host(`kk.alphacure.cloud`)"
       - "traefik.http.routers.keycloak.entrypoints=websecure"
       - "traefik.http.routers.keycloak.tls=true"
       - "traefik.http.routers.keycloak.tls.certresolver=letsencrypt"
@@ -143,7 +143,7 @@ services:
       - dokploy-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.gateway.rule=Host(`app.alphacure.com`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.gateway.rule=Host(`app.alphacure.cloud`) && PathPrefix(`/api`)"
       - "traefik.http.routers.gateway.entrypoints=websecure"
       - "traefik.http.routers.gateway.tls=true"
       - "traefik.http.routers.gateway.tls.certresolver=letsencrypt"
@@ -262,8 +262,8 @@ services:
       context: ./alphacure-ui
       dockerfile: Dockerfile
       args:
-        VITE_GATEWAY_URL: https://app.alphacure.com
-        VITE_KEYCLOAK_URL: https://kk.alphacure.com
+        VITE_GATEWAY_URL: https://app.alphacure.cloud
+        VITE_KEYCLOAK_URL: https://kk.alphacure.cloud
     container_name: alphacure-ui
     restart: unless-stopped
     networks:
@@ -271,7 +271,7 @@ services:
       - dokploy-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.ui.rule=Host(`app.alphacure.com`)"
+      - "traefik.http.routers.ui.rule=Host(`app.alphacure.cloud`)"
       - "traefik.http.routers.ui.entrypoints=websecure"
       - "traefik.http.routers.ui.tls=true"
       - "traefik.http.routers.ui.tls.certresolver=letsencrypt"
@@ -282,8 +282,8 @@ services:
       context: ./alphacure-admin
       dockerfile: Dockerfile
       args:
-        VITE_GATEWAY_URL: https://app.alphacure.com
-        VITE_KEYCLOAK_URL: https://kk.alphacure.com
+        VITE_GATEWAY_URL: https://app.alphacure.cloud
+        VITE_KEYCLOAK_URL: https://kk.alphacure.cloud
     container_name: alphacure-admin
     restart: unless-stopped
     networks:
@@ -291,7 +291,7 @@ services:
       - dokploy-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.admin.rule=Host(`admin.alphacure.com`)"
+      - "traefik.http.routers.admin.rule=Host(`admin.alphacure.cloud`)"
       - "traefik.http.routers.admin.entrypoints=websecure"
       - "traefik.http.routers.admin.tls=true"
       - "traefik.http.routers.admin.tls.certresolver=letsencrypt"

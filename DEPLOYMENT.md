@@ -90,7 +90,7 @@ Pour un déploiement de production, n'exposez pas directement les ports internes
    ```nginx
    server {
        listen 80;
-       server_name app.alphacure.com admin.alphacure.com api.alphacure.com keycloak.alphacure.com;
+       server_name app.alphacure.cloud admin.alphacure.cloud api.alphacure.cloud keycloak.alphacure.cloud;
 
        location / {
            return 301 https://$host$request_uri;
@@ -100,7 +100,7 @@ Pour un déploiement de production, n'exposez pas directement les ports internes
    # Exemple pour le portail patient/clinique (alphacure-ui)
    server {
        listen 443 ssl;
-       server_name app.alphacure.com;
+       server_name app.alphacure.cloud;
        # Certificats gérés par Certbot
        
        location / {
@@ -115,7 +115,7 @@ Pour un déploiement de production, n'exposez pas directement les ports internes
    # Exemple pour l'API Gateway (gateway-service)
    server {
        listen 443 ssl;
-       server_name api.alphacure.com;
+       server_name api.alphacure.cloud;
 
        location / {
            proxy_pass http://localhost:8080;
@@ -130,7 +130,7 @@ Pour un déploiement de production, n'exposez pas directement les ports internes
    ```bash
    sudo ln -s /etc/nginx/sites-available/alphacure.conf /etc/nginx/sites-enabled/
    sudo systemctl restart nginx
-   sudo certbot --nginx -d app.alphacure.com -d admin.alphacure.com -d api.alphacure.com -d keycloak.alphacure.com
+   sudo certbot --nginx -d app.alphacure.cloud -d admin.alphacure.cloud -d api.alphacure.cloud -d keycloak.alphacure.cloud
    ```
 
 ---
@@ -177,7 +177,7 @@ Configurez un **Ingress Controller** (ex: `ingress-nginx`) pour exposer les poin
    ```bash
    kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.0/deploy/static/provider/cloud/deploy.yaml
    ```
-2. Associez vos noms de domaine (ex: `app.alphacure.com`, `api.alphacure.com`) à l'adresse IP publique attribuée au LoadBalancer de l'Ingress Controller.
+2. Associez vos noms de domaine (ex: `app.alphacure.cloud`, `api.alphacure.cloud`) à l'adresse IP publique attribuée au LoadBalancer de l'Ingress Controller.
 
 ---
 
