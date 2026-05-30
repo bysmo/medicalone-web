@@ -17,6 +17,8 @@ spring:
             allowedOriginPatterns:
               - "http://localhost:*"
               - "http://127.0.0.1:*"
+              - "https://*.alphacure.cloud"
+              - "https://alphacure.cloud"
             allowedMethods:
               - GET
               - POST
