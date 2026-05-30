@@ -7,6 +7,7 @@ import { AnimatePresence } from 'framer-motion';
 import { patientService, nomenclatureService, insuranceService } from './services/api';
 import Toast from './components/Toast';
 import './components/Toast.css';
+import alphacureLogo from './assets/alphacure-logo.png';
 
 // --- Composants modulaires ---
 import { TopHeader, SidebarItem, QuickModal } from './components/ui/index';
@@ -129,26 +130,39 @@ const computeAgeAndTranche = (birthDateStr) => {
 const SidebarBrand = () => {
   const { name, logoDataUrl, loading } = useClinicBranding();
   return (
-    <div className="px-4 pb-4 border-b border-slate-700/60">
-      <div className="p-4 flex items-center gap-3 border-b border-slate-700/40 mb-3">
-        <Activity className="text-sky-400 shrink-0" size={24} />
-        <h1 className="text-xl font-black uppercase tracking-tighter text-white">AlphaCure</h1>
+    <div className="border-b" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
+      {/* AlphaCure Platform Logo */}
+      <div className="px-4 py-4 flex items-center gap-3">
+        <img
+          src={alphacureLogo}
+          alt="AlphaCure"
+          className="w-10 h-10 object-contain rounded-lg"
+          style={{ background: 'rgba(255,255,255,0.08)', padding: '4px' }}
+        />
+        <div>
+          <h1 className="text-base font-black uppercase tracking-tighter text-white leading-none">AlphaCure</h1>
+          <p className="text-[9px] font-medium mt-0.5" style={{ color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em' }}>CLINIC MANAGEMENT</p>
+        </div>
       </div>
+      {/* Clinic Branding Section */}
       {!loading && (name || logoDataUrl) && (
-        <div className="flex flex-col items-center gap-2 py-2 px-2 rounded-lg bg-slate-800/40">
+        <div className="mx-3 mb-3 flex items-center gap-2.5 py-2.5 px-3 rounded-xl"
+          style={{ background: 'rgba(26,127,151,0.12)', border: '1px solid rgba(26,127,151,0.2)' }}>
           {logoDataUrl ? (
             <img
               src={logoDataUrl}
               alt=""
-              className="w-14 h-14 rounded-lg object-contain bg-white/10 p-1"
+              className="w-9 h-9 rounded-lg object-contain shrink-0"
+              style={{ background: 'rgba(255,255,255,0.1)', padding: '3px' }}
             />
           ) : (
-            <div className="w-14 h-14 rounded-lg bg-slate-700/50 flex items-center justify-center text-sky-400/60 text-lg font-black">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center font-black text-base shrink-0"
+              style={{ background: 'rgba(26,127,151,0.2)', color: '#65c0d3' }}>
               {name ? name.charAt(0) : 'C'}
             </div>
           )}
           {name && (
-            <p className="text-[11px] font-bold text-white text-center leading-tight uppercase tracking-wide line-clamp-2">
+            <p className="text-[10px] font-bold text-white leading-tight uppercase tracking-wide line-clamp-2 flex-1">
               {name}
             </p>
           )}
@@ -416,34 +430,41 @@ const AppShell = ({ isPublic }) => {
     .filter(item => !item.subs || item.subs.length > 0);
 
   return (
-    <div className="flex min-h-screen bg-slate-100 font-sans text-slate-900">
+    <div className="flex min-h-screen font-sans" style={{ background: 'var(--ac-bg)', color: 'var(--ac-text-primary)' }}>
       {isMissingClinicContext() && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-amber-950 px-4 py-2 text-sm text-center shadow">
+        <div className="fixed top-0 left-0 right-0 z-50 px-4 py-2 text-sm text-center shadow"
+          style={{ background: '#e8a020', color: '#1a1000' }}>
           Votre compte n&apos;a pas de clinique associée dans Keycloak (clinic_id). Déconnectez-vous, demandez à l&apos;admin de resynchroniser votre accès (Paramétrage → Staff), puis reconnectez-vous.
         </div>
       )}
-      <div className="w-72 h-screen bg-[#1e293b] text-slate-300 flex flex-col sticky top-0 shrink-0 overflow-y-auto shadow-2xl">
+      {/* ── Sidebar ── */}
+      <div className="w-72 h-screen flex flex-col sticky top-0 shrink-0 overflow-y-auto shadow-2xl"
+        style={{ background: 'var(--ac-sidebar)' }}>
         <SidebarBrand />
-        <nav className="flex-1 py-4 px-2 space-y-1">
+        <nav className="flex-1 py-3 px-2 space-y-0.5">
           {allowedMenuItems.map((item) => (
             <SidebarItem key={item.id} item={item} activeTab={activeTab} setActiveTab={setActiveTab} expanded={expandedMenus.includes(item.id)} toggleExpand={toggleExpand} />
           ))}
         </nav>
 
         {/* Profile / Logout Footer */}
-        <div className="p-4 border-t border-slate-700/60 bg-slate-900/20 flex flex-col gap-3">
+        <div className="p-4 flex flex-col gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.07)', background: 'rgba(0,0,0,0.15)' }}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-400 font-bold text-sm shrink-0">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0"
+              style={{ background: 'rgba(26,127,151,0.2)', border: '1px solid rgba(26,127,151,0.35)', color: '#65c0d3' }}>
               {getUserProfile()?.name ? getUserProfile().name.charAt(0).toUpperCase() : (getUserProfile()?.username ? getUserProfile().username.charAt(0).toUpperCase() : 'U')}
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold text-white truncate">{getUserProfile()?.name || getUserProfile()?.username || 'Utilisateur'}</p>
-              <p className="text-[11px] text-slate-400 truncate">{getUserProfile()?.email || 'Membre AlphaCure'}</p>
+              <p className="text-[11px] truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>{getUserProfile()?.email || 'Membre AlphaCure'}</p>
             </div>
           </div>
           <button
             onClick={logout}
-            className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold bg-slate-800 hover:bg-rose-600 hover:text-white transition-all text-slate-400 border border-slate-700/50 cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            style={{ background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.25)', color: 'rgba(239,144,135,0.9)' }}
+            onMouseOver={e => { e.currentTarget.style.background = 'rgba(192,57,43,0.25)'; e.currentTarget.style.color = '#fff'; }}
+            onMouseOut={e => { e.currentTarget.style.background = 'rgba(192,57,43,0.12)'; e.currentTarget.style.color = 'rgba(239,144,135,0.9)'; }}
           >
             <LogOut size={14} />
             Se déconnecter
@@ -453,7 +474,7 @@ const AppShell = ({ isPublic }) => {
 
       <div className="flex-1 flex flex-col min-w-0">
         <TopHeader setActiveTab={setActiveTab} />
-        <main className="flex-1 p-10 bg-slate-50/50 overflow-y-auto">
+        <main className="flex-1 p-8 overflow-y-auto" style={{ background: 'var(--ac-bg)' }}>
           <AnimatePresence mode="wait">
             {activeTab === 'platform-admin-dashboard' && <PlatformAdminDashboard showToast={showToast} />}
             {activeTab === 'dashboard' && <GeneralDashboard showToast={showToast} />}
@@ -490,8 +511,8 @@ const AppShell = ({ isPublic }) => {
             {activeTab === 'patients-list' && (
               viewState === 'list' ? (
                 <div className="space-y-6 max-w-7xl mx-auto">
-                  <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-3">
-                    <Users size={28} className="text-sky-600" /> Dossiers Patients
+                  <h2 className="text-2xl font-black uppercase tracking-tight flex items-center gap-3" style={{ color: 'var(--ac-teal-700)' }}>
+                    <Users size={28} style={{ color: 'var(--ac-teal-500)' }} /> Dossiers Patients
                   </h2>
                   <DataTable
                     title="Registre des patients" columns={[
@@ -588,8 +609,8 @@ const AppShell = ({ isPublic }) => {
           {/* --- Rapid Creation Modals --- */}
           <QuickModal title="Nouveau Assureur" isOpen={showInsurerModal} onClose={() => setShowInsurerModal(false)}>
             <div className="space-y-4">
-              <input id="new-insurer-name" type="text" placeholder="Nom de l'assureur" className="w-full border border-slate-200 rounded p-3 text-sm outline-none focus:border-sky-500" />
-              <select id="new-insurer-scope" className="w-full border border-slate-200 rounded p-3 text-sm outline-none focus:border-sky-500 bg-white">
+              <input id="new-insurer-name" type="text" placeholder="Nom de l'assureur" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none" style={{ borderColor: 'var(--ac-border)' }} />
+              <select id="new-insurer-scope" className="w-full border rounded-xl p-3 text-sm outline-none bg-white" style={{ borderColor: 'var(--ac-border)' }}>
                 <option value="NATIONAL">Assurance Nationale</option>
                 <option value="INTERNATIONAL">Assurance Internationale</option>
               </select>
@@ -609,13 +630,13 @@ const AppShell = ({ isPublic }) => {
                     showToast("Erreur lors de la création de l'assureur", "error");
                   });
                 }
-              }} className="w-full bg-sky-700 text-white py-3 rounded font-black uppercase text-[10px] shadow-lg">Enregistrer Assureur</button>
+              }} className="w-full text-white py-3 rounded-xl font-black uppercase text-[10px] shadow-lg" style={{ background: 'var(--ac-teal-500)' }}>Enregistrer Assureur</button>
             </div>
           </QuickModal>
 
           <QuickModal title="Nouveau Souscripteur" isOpen={showSubscriberModal} onClose={() => setShowSubscriberModal(false)}>
             <div className="space-y-4">
-              <input id="new-sub-name" type="text" placeholder="Raison sociale / Nom" className="w-full border border-slate-200 rounded p-3 text-sm outline-none focus:border-sky-500" />
+              <input id="new-sub-name" type="text" placeholder="Raison sociale / Nom" className="w-full border rounded-xl p-3 text-sm outline-none" style={{ borderColor: 'var(--ac-border)' }} />
               <button onClick={() => {
                 const name = document.getElementById('new-sub-name').value;
                 if (name) {
@@ -635,7 +656,7 @@ const AppShell = ({ isPublic }) => {
                     showToast("Erreur lors de la création du souscripteur", "error");
                   });
                 }
-              }} className="w-full bg-sky-700 text-white py-3 rounded font-black uppercase text-[10px] shadow-lg">Enregistrer Souscripteur</button>
+              }} className="w-full text-white py-3 rounded-xl font-black uppercase text-[10px] shadow-lg" style={{ background: 'var(--ac-green-500)' }}>Enregistrer Souscripteur</button>
             </div>
           </QuickModal>
 

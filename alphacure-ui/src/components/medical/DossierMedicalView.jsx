@@ -399,6 +399,359 @@ const HistoryItem = ({ item, isActive, practitioners = [], onClick }) => {
   );
 };
 
+// ── MedicalBackgroundPanel ───────────────────────────────────────────────────
+const MedicalBackgroundPanel = ({ patientId, showToast }) => {
+  const [bloodGroup, setBloodGroup] = useState('');
+  const [rhesusFacteur, setRhesusFacteur] = useState('');
+  const [electrophorese, setElectrophorese] = useState('');
+  const [allergies, setAllergies] = useState([]);
+  const [newAllergy, setNewAllergy] = useState('');
+  const [vaccins, setVaccins] = useState([]);
+  const [newVaccineName, setNewVaccineName] = useState('');
+  const [newVaccineDate, setNewVaccineDate] = useState('');
+
+  const [isDiabetic, setIsDiabetic] = useState(false);
+  const [isAsthmatic, setIsAsthmatic] = useState(false);
+  const [isHypertensive, setIsHypertensive] = useState(false);
+  const [hivSerology, setHivSerology] = useState('');
+  const [otherSerologies, setOtherSerologies] = useState('');
+  const [medicalNotes, setMedicalNotes] = useState('');
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [prevPatientId, setPrevPatientId] = useState(patientId);
+
+  if (patientId !== prevPatientId) {
+    setPrevPatientId(patientId);
+    setLoading(true);
+  }
+
+  useEffect(() => {
+    if (!patientId) return;
+    medicalService.getMedicalBackground(patientId)
+      .then(res => {
+        const data = res.data || {};
+        setBloodGroup(data.bloodGroup || '');
+        setRhesusFacteur(data.rhesusFacteur || '');
+        setElectrophorese(data.electrophorese || '');
+
+        try {
+          setAllergies(data.allergies ? JSON.parse(data.allergies) : []);
+        } catch {
+          setAllergies([]);
+        }
+
+        try {
+          setVaccins(data.vaccins ? JSON.parse(data.vaccins) : []);
+        } catch {
+          setVaccins([]);
+        }
+
+        setIsDiabetic(!!data.isDiabetic);
+        setIsAsthmatic(!!data.isAsthmatic);
+        setIsHypertensive(!!data.isHypertensive);
+        setHivSerology(data.hivSerology || '');
+        setOtherSerologies(data.otherSerologies || '');
+        setMedicalNotes(data.medicalNotes || '');
+      })
+      .catch(err => {
+        console.error("Error loading medical background:", err);
+        showToast("Erreur lors du chargement des données médicales", "error");
+      })
+      .finally(() => setLoading(false));
+  }, [patientId, showToast]);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload = {
+        bloodGroup,
+        rhesusFacteur,
+        electrophorese,
+        allergies: JSON.stringify(allergies),
+        vaccins: JSON.stringify(vaccins),
+        isDiabetic,
+        isAsthmatic,
+        isHypertensive,
+        hivSerology,
+        otherSerologies,
+        medicalNotes
+      };
+      await medicalService.saveMedicalBackground(patientId, payload);
+      showToast("Données médicales enregistrées avec succès !", "success");
+    } catch (err) {
+      console.error("Error saving medical background:", err);
+      showToast("Erreur lors de l'enregistrement", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addAllergy = () => {
+    if (newAllergy.trim() && !allergies.includes(newAllergy.trim())) {
+      setAllergies([...allergies, newAllergy.trim()]);
+      setNewAllergy('');
+    }
+  };
+
+  const removeAllergy = (index) => {
+    setAllergies(allergies.filter((_, i) => i !== index));
+  };
+
+  const addVaccine = () => {
+    if (newVaccineName.trim()) {
+      setVaccins([...vaccins, { name: newVaccineName.trim(), date: newVaccineDate }]);
+      setNewVaccineName('');
+      setNewVaccineDate('');
+    }
+  };
+
+  const removeVaccine = (index) => {
+    setVaccins(vaccins.filter((_, i) => i !== index));
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8 bg-white border border-slate-200 rounded-2xl shadow-sm">
+        <Loader2 size={20} className="animate-spin text-emerald-500 mr-2" />
+        <span className="text-xs text-slate-500 font-bold">Chargement des données médicales...</span>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSave} className="space-y-5">
+      {/* 1. Groupe Sanguin, Rhesus & Electrophorese */}
+      <div className="bg-gradient-to-br from-slate-50 to-white border border-slate-150 rounded-2xl p-5 shadow-sm space-y-4">
+        <h5 className="text-[10px] font-black text-emerald-700 uppercase tracking-widest flex items-center gap-1.5 pb-2 border-b border-slate-100">
+          <Heart size={12} className="text-rose-500" /> Profil Hématologique & Génétique
+        </h5>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Groupe Sanguin</label>
+            <select
+              value={bloodGroup}
+              onChange={e => setBloodGroup(e.target.value)}
+              className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm text-slate-700 outline-none focus:border-emerald-450 focus:ring-2 focus:ring-emerald-100 transition-all cursor-pointer"
+            >
+              <option value="">Sélectionner</option>
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="AB">AB</option>
+              <option value="O">O</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Facteur Rhésus</label>
+            <select
+              value={rhesusFacteur}
+              onChange={e => setRhesusFacteur(e.target.value)}
+              className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm text-slate-700 outline-none focus:border-emerald-450 focus:ring-2 focus:ring-emerald-100 transition-all cursor-pointer"
+            >
+              <option value="">Sélectionner</option>
+              <option value="POSITIF">Positif (+)</option>
+              <option value="NEGATIF">Négatif (-)</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Électrophorèse (Drépanocytose)</label>
+            <select
+              value={electrophorese}
+              onChange={e => setElectrophorese(e.target.value)}
+              className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm text-slate-700 outline-none focus:border-emerald-450 focus:ring-2 focus:ring-emerald-100 transition-all cursor-pointer"
+            >
+              <option value="">Sélectionner</option>
+              <option value="AA">AA</option>
+              <option value="AS">AS</option>
+              <option value="SS">SS</option>
+              <option value="AC">AC</option>
+              <option value="SC">SC</option>
+              <option value="CC">CC</option>
+              <option value="AUTRES">Autres</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Pathologies chroniques */}
+      <div className="bg-gradient-to-br from-slate-50 to-white border border-slate-150 rounded-2xl p-5 shadow-sm space-y-4">
+        <h5 className="text-[10px] font-black text-emerald-700 uppercase tracking-widest flex items-center gap-1.5 pb-2 border-b border-slate-100">
+          <Activity size={12} /> Profil de Risque & Pathologies Chroniques
+        </h5>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <label className="flex items-center justify-between bg-white border border-slate-200 rounded-xl p-3.5 hover:border-slate-350 transition-colors cursor-pointer select-none">
+            <span className="text-xs font-bold text-slate-700">Diabétique</span>
+            <input
+              type="checkbox"
+              checked={isDiabetic}
+              onChange={e => setIsDiabetic(e.target.checked)}
+              className="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
+            />
+          </label>
+          <label className="flex items-center justify-between bg-white border border-slate-200 rounded-xl p-3.5 hover:border-slate-350 transition-colors cursor-pointer select-none">
+            <span className="text-xs font-bold text-slate-700">Asthmatique</span>
+            <input
+              type="checkbox"
+              checked={isAsthmatic}
+              onChange={e => setIsAsthmatic(e.target.checked)}
+              className="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
+            />
+          </label>
+          <label className="flex items-center justify-between bg-white border border-slate-200 rounded-xl p-3.5 hover:border-slate-350 transition-colors cursor-pointer select-none">
+            <span className="text-xs font-bold text-slate-700">Hypertension (HTA)</span>
+            <input
+              type="checkbox"
+              checked={isHypertensive}
+              onChange={e => setIsHypertensive(e.target.checked)}
+              className="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
+            />
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          <div>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Sérologie VIH</label>
+            <select
+              value={hivSerology}
+              onChange={e => setHivSerology(e.target.value)}
+              className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm text-slate-700 outline-none focus:border-emerald-450 focus:ring-2 focus:ring-emerald-100 transition-all cursor-pointer"
+            >
+              <option value="">Sélectionner</option>
+              <option value="POSITIVE">Positive</option>
+              <option value="NEGATIVE">Négative</option>
+              <option value="NON_TESTEE">Non testée</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Autres Sérologies</label>
+            <input
+              type="text"
+              value={otherSerologies}
+              onChange={e => setOtherSerologies(e.target.value)}
+              placeholder="Ex: Hépatite B négative, Syphilis négative..."
+              className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm text-slate-700 outline-none focus:border-emerald-450 focus:ring-2 focus:ring-emerald-100 transition-all"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Allergies & Vaccins */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* Allergies */}
+        <div className="bg-gradient-to-br from-slate-50 to-white border border-slate-150 rounded-2xl p-5 shadow-sm space-y-4">
+          <h5 className="text-[10px] font-black text-emerald-700 uppercase tracking-widest flex items-center gap-1.5 pb-2 border-b border-slate-100">
+            <Pill size={12} className="text-amber-500" /> Allergies
+          </h5>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newAllergy}
+              onChange={e => setNewAllergy(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAllergy(); } }}
+              placeholder="Ajouter une allergie..."
+              className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 outline-none focus:border-emerald-400 transition-all"
+            />
+            <button
+              type="button"
+              onClick={addAllergy}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-3 text-[10px] font-black uppercase transition-colors"
+            >
+              Ajouter
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pt-1">
+            {allergies.length === 0 ? (
+              <span className="text-[11px] font-bold text-slate-400 italic">Aucune allergie répertoriée</span>
+            ) : (
+              allergies.map((allergy, idx) => (
+                <span key={idx} className="inline-flex items-center gap-1 bg-rose-50 border border-rose-100 text-rose-750 text-[11px] font-bold px-2 py-0.5 rounded-lg">
+                  {allergy}
+                  <button type="button" onClick={() => removeAllergy(idx)} className="text-rose-450 hover:text-rose-600 transition-colors">
+                    <X size={10} />
+                  </button>
+                </span>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Vaccins */}
+        <div className="bg-gradient-to-br from-slate-50 to-white border border-slate-150 rounded-2xl p-5 shadow-sm space-y-4">
+          <h5 className="text-[10px] font-black text-emerald-700 uppercase tracking-widest flex items-center gap-1.5 pb-2 border-b border-slate-100">
+            <FlaskConical size={12} className="text-sky-500" /> Vaccinations
+          </h5>
+          <div className="flex flex-col gap-2">
+            <input
+              type="text"
+              value={newVaccineName}
+              onChange={e => setNewVaccineName(e.target.value)}
+              placeholder="Nom du vaccin..."
+              className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 outline-none focus:border-emerald-400 transition-all"
+            />
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={newVaccineDate}
+                onChange={e => setNewVaccineDate(e.target.value)}
+                className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 outline-none focus:border-emerald-400 transition-all"
+              />
+              <button
+                type="button"
+                onClick={addVaccine}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-3 text-[10px] font-black uppercase transition-colors"
+              >
+                Ajouter
+              </button>
+            </div>
+          </div>
+          <div className="space-y-1.5 max-h-40 overflow-y-auto pt-1">
+            {vaccins.length === 0 ? (
+              <p className="text-[11px] font-bold text-slate-400 italic">Aucun vaccin répertorié</p>
+            ) : (
+              vaccins.map((vaccine, idx) => (
+                <div key={idx} className="flex items-center justify-between bg-sky-50 border border-sky-100 text-sky-850 text-xs px-2.5 py-1.5 rounded-lg">
+                  <div>
+                    <span className="block font-bold">{vaccine.name}</span>
+                    {vaccine.date && <span className="block text-[9px] text-slate-400 font-mono mt-0.5">Fait le {formatDate(vaccine.date)}</span>}
+                  </div>
+                  <button type="button" onClick={() => removeVaccine(idx)} className="text-rose-450 hover:text-rose-605 transition-colors">
+                    <X size={12} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Notes médicales générales */}
+      <div className="bg-gradient-to-br from-slate-50 to-white border border-slate-150 rounded-2xl p-5 shadow-sm space-y-4">
+        <h5 className="text-[10px] font-black text-emerald-700 uppercase tracking-widest flex items-center gap-1.5 pb-2 border-b border-slate-100">
+          <FileText size={12} /> Notes Médicales & Antécédents Divers
+        </h5>
+        <textarea
+          rows={3}
+          value={medicalNotes}
+          onChange={e => setMedicalNotes(e.target.value)}
+          placeholder="Antécédents familiaux, chirurgicaux, contre-indications permanentes..."
+          className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm text-slate-700 outline-none focus:border-emerald-450 focus:ring-2 focus:ring-emerald-100 transition-all resize-none"
+        />
+      </div>
+
+      {/* Save button */}
+      <button
+        type="submit"
+        disabled={saving}
+        className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[11px] font-black uppercase flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 hover:opacity-90 transition-opacity disabled:opacity-50"
+      >
+        {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+        {saving ? 'Enregistrement...' : 'Enregistrer les données médicales'}
+      </button>
+    </form>
+  );
+};
+
 // ── Main DossierMedicalView ───────────────────────────────────────────────────
 const DossierMedicalView = ({ consultationId, patientId, prestationId, patientName, patientCode, onClose, showToast, backLabel = 'Retour' }) => {
   const [history, setHistory] = useState([]);
@@ -408,7 +761,7 @@ const DossierMedicalView = ({ consultationId, patientId, prestationId, patientNa
   const [ending, setEnding] = useState(false);
   const [loading, setLoading] = useState(!!patientId);
   const [prevPatientId, setPrevPatientId] = useState(patientId);
-  const [activeTab, setActiveTab] = useState('constantes');
+  const [activeTab, setActiveTab] = useState('background');
 
   if (patientId !== prevPatientId) {
     setPrevPatientId(patientId);
@@ -872,6 +1225,7 @@ const DossierMedicalView = ({ consultationId, patientId, prestationId, patientNa
           {/* Content tabs */}
           <div className="flex gap-1 bg-white border border-slate-200 rounded-xl p-1 shadow-sm no-print">
             {[
+              { id: 'background', label: 'Données Médicales', icon: Heart },
               { id: 'constantes', label: 'Constantes', icon: Activity },
               { id: 'consultation', label: nature === 'SEANCES' ? 'Séance' : 'Consultation', icon: Icon },
               { id: 'imagerie', label: 'Imagerie (DICOM)', icon: FileText },
@@ -882,6 +1236,16 @@ const DossierMedicalView = ({ consultationId, patientId, prestationId, patientNa
               </button>
             ))}
           </div>
+
+          {/* Données Médicales Tab */}
+          {activeTab === 'background' && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <Heart size={11} className="text-rose-500" /> Données médicales de base
+              </h4>
+              <MedicalBackgroundPanel patientId={patientId} showToast={showToast} />
+            </div>
+          )}
 
           {/* Constantes Tab */}
           {activeTab === 'constantes' && (

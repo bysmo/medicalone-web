@@ -56,6 +56,10 @@ public class Patient {
     private String email;
     private String address;
 
+    // --- Informations Professionnelles ---
+    private String profession;
+    private String fonction;
+
     // --- Informations Assurance ---
     private String insurer;
     private String subscriber;

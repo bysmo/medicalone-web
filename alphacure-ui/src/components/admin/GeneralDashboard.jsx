@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import {
   patientService, prestationService, practitionerService,
-  cashSessionService
+  cashSessionService, invoiceService, externalPrescribingDoctorService
 } from '../../services/api';
 import { hasRole } from '../../services/auth';
 
@@ -68,6 +68,8 @@ const GeneralDashboard = ({ showToast }) => {
   const [practitioners, setPractitioners] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [externalDoctors, setExternalDoctors] = useState([]);
 
   // Computed Aggregated States
   const [stats, setStats] = useState({
@@ -90,7 +92,8 @@ const GeneralDashboard = ({ showToast }) => {
     financialHistory: [], // Day by day trend
     
     staffByType: {},
-    doctorsBySpecialty: {}
+    doctorsBySpecialty: {},
+    recommenders: []
   });
 
   // Asynchronously load transactions for cash sessions overlapping with the date range
@@ -128,7 +131,9 @@ const GeneralDashboard = ({ showToast }) => {
         const promises = [
           patientService.search('', 0, 10000).catch(() => ({ data: { content: [] } })),
           prestationService.getAll().catch(() => ({ data: [] })),
-          practitionerService.getAll().catch(() => ({ data: [] }))
+          practitionerService.getAll().catch(() => ({ data: [] })),
+          invoiceService.getAll().catch(() => ({ data: [] })),
+          externalPrescribingDoctorService.getAll().catch(() => ({ data: [] }))
         ];
         if (canViewFinancials) {
           promises.push(cashSessionService.getAll().catch(() => ({ data: [] })));
@@ -139,11 +144,15 @@ const GeneralDashboard = ({ showToast }) => {
         const pats = results[0].data?.content || [];
         const prests = results[1].data || [];
         const practs = results[2].data || [];
-        const sess = canViewFinancials ? (results[3]?.data || []) : [];
+        const invs = results[3].data || [];
+        const extDocs = results[4].data || [];
+        const sess = canViewFinancials ? (results[5]?.data || []) : [];
 
         setPatients(pats);
         setPrestations(prests);
         setPractitioners(practs);
+        setInvoices(invs);
+        setExternalDoctors(extDocs);
 
         if (canViewFinancials) {
           setSessions(sess);
@@ -306,6 +315,34 @@ const GeneralDashboard = ({ showToast }) => {
         }
       });
 
+      // 5. Recommending Doctors stats
+      const recommenderData = {};
+      filteredPrestations.forEach(p => {
+        const inv = invoices.find(i => i.id === p.invoiceId);
+        if (inv && inv.prescribingDoctorId) {
+          const docId = inv.prescribingDoctorId;
+          const actPrice = p.totalPrice || (p.unitPrice * (p.quantity || 1));
+          if (!recommenderData[docId]) {
+            recommenderData[docId] = { count: 0, amount: 0 };
+          }
+          recommenderData[docId].count += (p.quantity || 1);
+          recommenderData[docId].amount += Number(actPrice || 0);
+        }
+      });
+
+      const recommenderStatsList = [];
+      Object.entries(recommenderData).forEach(([docId, data]) => {
+        const doc = externalDoctors.find(d => d.id === docId);
+        recommenderStatsList.push({
+          id: docId,
+          name: doc ? doc.fullName : 'Médecin externe inconnu',
+          specialty: doc ? doc.specialty : 'Médecin prescripteur',
+          count: data.count,
+          amount: data.amount
+        });
+      });
+      recommenderStatsList.sort((a, b) => b.amount - a.amount);
+
       setStats({
         totalPatients: totalPats,
         newPatientsOnPeriod: newPats,
@@ -326,12 +363,13 @@ const GeneralDashboard = ({ showToast }) => {
         financialHistory,
         
         staffByType: staffTypeCounts,
-        doctorsBySpecialty: doctorSpecialtyCounts
+        doctorsBySpecialty: doctorSpecialtyCounts,
+        recommenders: recommenderStatsList
       });
     };
 
     computeAggregations();
-  }, [patients, prestations, practitioners, transactions, startDate, endDate]);
+  }, [patients, prestations, practitioners, transactions, invoices, externalDoctors, startDate, endDate]);
 
   // Quick Preset Helper
   const applyPreset = (presetName) => {
@@ -783,6 +821,51 @@ const GeneralDashboard = ({ showToast }) => {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* 5.5 Recommending Practitioners Stats */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-6">
+        <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Stethoscope size={16} className="text-indigo-600" />
+            <h4 className="text-[10px] font-black uppercase text-slate-700 tracking-widest">Activité par Praticien Recommandeur (Prescripteurs Externes)</h4>
+          </div>
+          <span className="bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider">
+            {stats.recommenders?.length || 0} praticien{stats.recommenders?.length > 1 ? 's' : ''}
+          </span>
+        </div>
+
+        {(!stats.recommenders || stats.recommenders.length === 0) ? (
+          <div className="text-center py-12 text-slate-400 font-bold text-xs">Aucune recommandation enregistrée sur cette période</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100 text-[10px] text-slate-400 font-black uppercase tracking-wider">
+                  <th className="pb-3 font-semibold">Praticien Recommandeur</th>
+                  <th className="pb-3 font-semibold text-center">Nombre d'Actes</th>
+                  <th className="pb-3 font-semibold text-right">Montant Global</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
+                {stats.recommenders.map(rec => (
+                  <tr key={rec.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="py-3">
+                      <div className="font-bold text-slate-800">{rec.name}</div>
+                      <div className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">{rec.specialty || 'Externe'}</div>
+                    </td>
+                    <td className="py-3 text-center font-bold text-slate-600">
+                      {rec.count} acte{rec.count > 1 ? 's' : ''}
+                    </td>
+                    <td className="py-3 text-right font-black font-mono text-indigo-600">
+                      {formatFCFA(rec.amount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* 6. Financial Trends Section */}

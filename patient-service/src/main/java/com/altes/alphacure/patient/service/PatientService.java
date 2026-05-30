@@ -63,6 +63,8 @@ public class PatientService {
                 .phone3(request.getPhone3())
                 .email(request.getEmail())
                 .address(request.getAddress())
+                .profession(request.getProfession())
+                .fonction(request.getFonction())
                 .insurer(request.getInsurer())
                 .subscriber(request.getSubscriber())
                 .mainInsured(request.getMainInsured())
@@ -101,6 +103,8 @@ public class PatientService {
         patient.setPhone3(request.getPhone3());
         patient.setEmail(request.getEmail());
         patient.setAddress(request.getAddress());
+        patient.setProfession(request.getProfession());
+        patient.setFonction(request.getFonction());
         patient.setDossierNumber(request.getDossierNumber());
         patient.setSsn(request.getSsn());
         patient.setInsurer(request.getInsurer());
@@ -158,6 +162,8 @@ public class PatientService {
         response.setPhone3(patient.getPhone3());
         response.setEmail(patient.getEmail());
         response.setAddress(patient.getAddress());
+        response.setProfession(patient.getProfession());
+        response.setFonction(patient.getFonction());
         response.setInsurer(patient.getInsurer());
         response.setSubscriber(patient.getSubscriber());
         response.setMainInsured(patient.getMainInsured());

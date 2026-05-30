@@ -18,6 +18,8 @@ public class PatientRequest {
     private String phone3;
     private String email;
     private String address;
+    private String profession;
+    private String fonction;
     private String dossierNumber;
     private String ssn; // Nouveau
     

@@ -12,6 +12,7 @@ const PatientFormView = ({ onBack, onSave, patient = null, isViewOnly = false, s
     dossierNumber: 'DOS-' + Math.floor(1000 + Math.random() * 9000),
     ssn: '', firstName: '', lastName: '', gender: 'M', birthDate: '', birthPlace: '',
     phone1: '', phone2: '', phone3: '', email: '', address: '',
+    profession: '', fonction: '',
     insurer: '', subscriber: '', mainInsured: '', policyNumber: '',
     coverageRate: 0, insuranceStartDate: '', insuranceEndDate: '', isActive: true
   });
@@ -101,6 +102,10 @@ const PatientFormView = ({ onBack, onSave, patient = null, isViewOnly = false, s
               </select>
               <input type="date" readOnly={isViewOnly} className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-sm outline-none focus:border-sky-500" value={formData.birthDate || ''} onChange={e => handleChange('birthDate', e.target.value)} />
               <input readOnly={isViewOnly} placeholder="Lieu de naissance" className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-sm outline-none focus:border-sky-500" value={formData.birthPlace || ''} onChange={e => handleChange('birthPlace', e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <input readOnly={isViewOnly} placeholder="Profession (optionnel)" className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-sm outline-none focus:border-sky-500" value={formData.profession || ''} onChange={e => handleChange('profession', e.target.value)} />
+              <input readOnly={isViewOnly} placeholder="Fonction / Poste (optionnel)" className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-sm outline-none focus:border-sky-500" value={formData.fonction || ''} onChange={e => handleChange('fonction', e.target.value)} />
             </div>
           </InputSection>
 

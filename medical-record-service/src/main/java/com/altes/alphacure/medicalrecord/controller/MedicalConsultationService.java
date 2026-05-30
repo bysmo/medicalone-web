@@ -182,6 +182,47 @@ public class MedicalConsultationService {
         return consultationRepository.save(consultation);
     }
 
+    public Consultation validateSeance(UUID prestationId, UUID patientId, UUID practitionerId, UUID clinicId, String actName) {
+        Consultation consultation = null;
+        if (prestationId != null) {
+            java.util.Optional<Consultation> byId = consultationRepository.findById(prestationId);
+            if (byId.isPresent()) {
+                consultation = byId.get();
+            } else {
+                List<Consultation> byPrestationId = consultationRepository.findByPrestationId(prestationId);
+                if (!byPrestationId.isEmpty()) {
+                    consultation = byPrestationId.stream()
+                            .filter(c -> c.getMedicalStatus() != MedicalStatus.TERMINEE)
+                            .findFirst()
+                            .orElse(byPrestationId.get(0));
+                }
+            }
+        }
+
+        if (consultation != null) {
+            consultation.setPractitionerId(practitionerId);
+            consultation.setMedicalStatus(MedicalStatus.TERMINEE);
+            if (consultation.getStartTime() == null) {
+                consultation.setStartTime(LocalDateTime.now());
+            }
+            consultation.setEndTime(LocalDateTime.now());
+            return consultationRepository.save(consultation);
+        }
+
+        Consultation newConsultation = Consultation.builder()
+                .clinicId(clinicId)
+                .patientId(patientId)
+                .practitionerId(practitionerId)
+                .prestationId(prestationId)
+                .nature("SEANCES")
+                .actName(actName)
+                .medicalStatus(MedicalStatus.TERMINEE)
+                .startTime(LocalDateTime.now())
+                .endTime(LocalDateTime.now())
+                .build();
+        return consultationRepository.save(newConsultation);
+    }
+
     public void deleteConsultation(UUID consultationId, UUID clinicId) {
         Consultation consultation = consultationRepository.findById(consultationId)
                 .orElseThrow(() -> new RuntimeException("Consultation introuvable: " + consultationId));

@@ -3,9 +3,10 @@ import {
   Activity, Landmark, Key, Unlock, Lock, AlertTriangle, FileText, CheckCircle2,
   ArrowUpRight, ArrowDownRight, RefreshCw, Printer, PlusCircle, Check, Trash2, XCircle
 } from 'lucide-react';
-import { cashSessionService, nomenclatureService, invoiceService, practitionerService, patientService, clinicService, prestationService } from '../../services/api';
+import { cashSessionService, nomenclatureService, invoiceService, practitionerService, patientService, clinicService, prestationService, discountRequestService } from '../../services/api';
 import DataTable from '../ui/DataTable';
 import { useClientTable } from '../../hooks/useClientTable';
+import { hasRole } from '../../services/auth';
 
 const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -49,8 +50,18 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
   // Pending Invoices
   const [pendingInvoices, setPendingInvoices] = useState([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
+  
+  // Discount Request States
+  const [pendingDiscountRequests, setPendingDiscountRequests] = useState([]);
+  const [loadingDiscountRequests, setLoadingDiscountRequests] = useState(false);
+  const [selectedInvoiceForDiscount, setSelectedInvoiceForDiscount] = useState(null);
+  const [proposedDiscountAmount, setProposedDiscountAmount] = useState('');
+  const [submittingDiscount, setSubmittingDiscount] = useState(false);
+  const [selectedDiscountRequest, setSelectedDiscountRequest] = useState(null);
+  const [processingDiscountValidation, setProcessingDiscountValidation] = useState(false);
+
   const { onSearch: onSearchInvoices, paginated: paginatedInvoices, pagination: invoicesPagination } = useClientTable(pendingInvoices, {
-    searchKeys: ['invoiceRef', 'bordereauCode'],
+    searchKeys: ['invoiceRef', 'bordereauCode', 'patientName', 'patientCode'],
     initialPageSize: 10,
   });
 
@@ -84,6 +95,11 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
 
   const { onSearch: onSearchRefunds, paginated: paginatedRefunds, pagination: refundsPagination } = useClientTable(pendingRefunds, {
     searchKeys: ['actName', 'patientName', 'invoiceRef', 'reason'],
+    initialPageSize: 10,
+  });
+
+  const { onSearch: onSearchDiscountRequests, paginated: paginatedDiscountRequests, pagination: discountRequestsPagination } = useClientTable(pendingDiscountRequests, {
+    searchKeys: ['patientName', 'patientCode', 'invoiceRef'],
     initialPageSize: 10,
   });
 
@@ -185,12 +201,38 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
     try {
       const res = await invoiceService.getAll();
       const allInvoices = res.data || [];
-      // filter only pending
-      setPendingInvoices(allInvoices.filter(inv => inv.status === 'PENDING' || inv.status === 'PARTIAL'));
+      const pending = allInvoices.filter(inv => inv.status === 'PENDING' || inv.status === 'PARTIAL');
+      
+      const enrichedPending = await Promise.all(pending.map(async inv => {
+        try {
+          const pRes = await patientService.getById(inv.patientId);
+          return {
+            ...inv,
+            patientName: pRes.data ? pRes.data.fullName : 'Patient inconnu',
+            patientCode: pRes.data ? pRes.data.patientCode : 'PAT-XXXX'
+          };
+        } catch {
+          return { ...inv, patientName: 'Patient inconnu', patientCode: 'PAT-XXXX' };
+        }
+      }));
+
+      setPendingInvoices(enrichedPending);
     } catch (err) {
       console.error("Error loading invoices", err);
     } finally {
       setLoadingInvoices(false);
+    }
+  }
+
+  async function fetchPendingDiscountRequests() {
+    setLoadingDiscountRequests(true);
+    try {
+      const res = await discountRequestService.getPending();
+      setPendingDiscountRequests(res.data || []);
+    } catch (err) {
+      console.error("Error loading pending discount requests", err);
+    } finally {
+      setLoadingDiscountRequests(false);
     }
   }
 
@@ -280,13 +322,22 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
     setTimeout(() => {
       if (activeTab === 'a-encaisser') {
         fetchPendingInvoices();
+        fetchPendingDiscountRequests();
       } else if (activeTab === 'encaissements') {
         fetchSessionsHistory();
       } else if (activeTab === 'remboursements') {
         fetchPendingRefunds();
+      } else if (activeTab === 'reductions') {
+        fetchPendingDiscountRequests();
       }
     }, 0);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (hasRole('ADMIN') || hasRole('COMPTABLE') || hasRole('MANAGER_CLINIQUE')) {
+      fetchPendingDiscountRequests();
+    }
+  }, []);
 
   const handleOpenSession = async (e) => {
     e.preventDefault();
@@ -449,6 +500,64 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
     } catch (err) {
       console.error(err);
       showToast("Erreur lors de l'annulation de l'opération.", "error");
+    }
+  };
+
+  const handleCreateDiscountRequest = async (e) => {
+    e.preventDefault();
+    if (!selectedInvoiceForDiscount) return;
+    
+    const propAmt = Number(proposedDiscountAmount);
+    const origAmt = selectedInvoiceForDiscount.patientAmount;
+
+    if (isNaN(propAmt) || propAmt < 0 || propAmt >= origAmt) {
+      showToast("Veuillez indiquer un montant valide inférieur au montant initial.", "error");
+      return;
+    }
+
+    setSubmittingDiscount(true);
+    try {
+      await discountRequestService.create({
+        invoiceId: selectedInvoiceForDiscount.id,
+        patientId: selectedInvoiceForDiscount.patientId,
+        proposedAmount: propAmt
+      });
+      showToast("Demande de réduction soumise pour validation.", "success");
+      setSelectedInvoiceForDiscount(null);
+      setProposedDiscountAmount('');
+      fetchPendingInvoices();
+      fetchPendingDiscountRequests();
+    } catch (err) {
+      console.error("Error creating discount request", err);
+      const msg = err.response?.data?.message || "Erreur lors de la création de la demande de réduction.";
+      showToast(msg, "error");
+    } finally {
+      setSubmittingDiscount(false);
+    }
+  };
+
+  const handleResolveDiscountRequest = async (status) => {
+    if (!selectedDiscountRequest) return;
+    setProcessingDiscountValidation(true);
+    try {
+      await discountRequestService.validate(selectedDiscountRequest.id, {
+        status: status
+      });
+      showToast(
+        status === 'APPROVED' 
+          ? "La réduction a été validée et appliquée avec succès." 
+          : "La demande de réduction a été rejetée.", 
+        "info"
+      );
+      setSelectedDiscountRequest(null);
+      fetchPendingDiscountRequests();
+      fetchPendingInvoices();
+    } catch (err) {
+      console.error("Error resolving discount request", err);
+      const msg = err.response?.data?.message || "Erreur lors du traitement de la demande de réduction.";
+      showToast(msg, "error");
+    } finally {
+      setProcessingDiscountValidation(false);
     }
   };
 
@@ -700,6 +809,16 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
       render: (row) => <span className="font-bold text-sky-600 font-mono">{row.invoiceRef}</span>
     },
     {
+      label: 'Patient',
+      key: 'patientName',
+      render: (row) => (
+        <div className="flex flex-col">
+          <span className="font-bold text-slate-800">{row.patientName || 'Chargement...'}</span>
+          {row.patientCode && <span className="text-[10px] text-slate-400 font-mono font-bold">{row.patientCode}</span>}
+        </div>
+      )
+    },
+    {
       label: 'Bordereau Physique',
       key: 'bordereauCode',
       render: (row) => <span className="font-bold text-slate-700">{row.bordereauCode || '---'}</span>
@@ -763,6 +882,54 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
     {
       label: "Demandé par",
       key: "requestedBy"
+    }
+  ];
+
+  const discountRequestColumns = [
+    {
+      label: "Date Demande",
+      key: "requestedAt",
+      render: (row) => new Date(row.requestedAt).toLocaleString('fr-FR')
+    },
+    {
+      label: "Patient",
+      key: "patientName",
+      render: (row) => (
+        <div className="flex flex-col">
+          <span className="font-bold text-slate-800">{row.patientName || 'Patient inconnu'}</span>
+          {row.patientCode && <span className="text-[10px] text-slate-400 font-mono font-bold">{row.patientCode}</span>}
+        </div>
+      )
+    },
+    {
+      label: "Facture Réf",
+      key: "invoiceRef",
+      render: (row) => <span className="font-bold text-sky-600 font-mono">{row.invoiceRef}</span>
+    },
+    {
+      label: "Montant Net d'Origine",
+      key: "originalPatientAmount",
+      render: (row) => <span className="font-semibold text-slate-500">{formatCurrency(row.originalPatientAmount)} FCFA</span>
+    },
+    {
+      label: "Montant Proposé",
+      key: "proposedPatientAmount",
+      render: (row) => <span className="font-bold text-slate-700">{formatCurrency(row.proposedPatientAmount)} FCFA</span>
+    },
+    {
+      label: "Réduction Demandée",
+      key: "discountAmount",
+      render: (row) => (
+        <div className="flex flex-col">
+          <span className="font-bold text-rose-600">-{formatCurrency(row.discountAmount)} FCFA</span>
+          <span className="text-[10px] text-rose-500 font-bold">({row.discountPercent}%)</span>
+        </div>
+      )
+    },
+    {
+      label: "Demandé Par",
+      key: "requestedBy",
+      render: (row) => <span className="text-slate-500 font-semibold">{row.requestedBy}</span>
     }
   ];
 
@@ -1230,6 +1397,20 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
         >
           Remboursements / Décaissements
         </button>
+        {(hasRole('ADMIN') || hasRole('COMPTABLE') || hasRole('MANAGER_CLINIQUE')) && (
+          <button
+            onClick={() => setActiveTab('reductions')}
+            className={`px-5 py-2.5 font-bold text-xs uppercase tracking-widest border-b-2 transition-all whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'reductions' ? 'border-sky-600 text-sky-600' : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}
+          >
+            Demandes de Réduction
+            {pendingDiscountRequests.length > 0 && (
+              <span className="px-1.5 py-0.5 text-[9px] font-black bg-rose-500 text-white rounded-full animate-pulse">
+                {pendingDiscountRequests.length}
+              </span>
+            )}
+          </button>
+        )}
         {activeSession && activeSession.caisseCode === 'CAISSE_PRINCIPALE' && (
           <button
             onClick={() => {
@@ -1614,16 +1795,48 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
           searchPlaceholder="Rechercher par Réf ou Bordereau..."
           entryLabel="prestations"
           pagination={invoicesPagination}
-          extraActions={(row) => (
-            <button
-              onClick={() => handlePayInvoice(row)}
-              disabled={!activeSession || activeSession.caisseCode === 'CAISSE_PRINCIPALE'}
-              className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white px-3 py-1.5 rounded text-[10px] font-black uppercase tracking-wider shadow-sm flex items-center justify-center gap-1 mx-auto"
-              title={activeSession?.caisseCode === 'CAISSE_PRINCIPALE' ? "La caisse principale ne peut pas encaisser les prestations des patients" : ""}
-            >
-              <Check size={12} /> Encaisser
-            </button>
-          )}
+          extraActions={(row) => {
+            const hasPendingDiscount = pendingDiscountRequests.some(req => req.invoiceId === row.id);
+            return (
+              <div className="flex flex-col sm:flex-row gap-2 justify-center items-center">
+                {hasPendingDiscount ? (
+                  <>
+                    <button
+                      disabled
+                      className="bg-slate-200 text-slate-400 px-3 py-1.5 rounded text-[10px] font-black uppercase tracking-wider shadow-sm flex items-center justify-center gap-1 cursor-not-allowed"
+                      title="Une demande de réduction est en cours d'approbation"
+                    >
+                      <Check size={12} /> Encaisser
+                    </button>
+                    <span className="px-2.5 py-1 text-[9px] font-black uppercase tracking-wider rounded-full bg-amber-50 border border-amber-200 text-amber-700 animate-pulse">
+                      Réduction en attente
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => handlePayInvoice(row)}
+                      disabled={!activeSession || activeSession.caisseCode === 'CAISSE_PRINCIPALE'}
+                      className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white px-3 py-1.5 rounded text-[10px] font-black uppercase tracking-wider shadow-sm flex items-center justify-center gap-1"
+                      title={activeSession?.caisseCode === 'CAISSE_PRINCIPALE' ? "La caisse principale ne peut pas encaisser les prestations des patients" : ""}
+                    >
+                      <Check size={12} /> Encaisser
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedInvoiceForDiscount(row);
+                        setProposedDiscountAmount('');
+                      }}
+                      disabled={!activeSession || activeSession.caisseCode === 'CAISSE_PRINCIPALE'}
+                      className="bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 text-white px-3 py-1.5 rounded text-[10px] font-black uppercase tracking-wider shadow-sm flex items-center justify-center gap-1"
+                    >
+                      Demander réduction
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          }}
         />
       ) : activeTab === 'encaissements' ? (
         // TAB 2.3 — Session Cash In Flow Transactions & Past Sessions using DataTables
@@ -1676,6 +1889,29 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
                 onClick={() => setSelectedRefund(row)}
                 className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded text-[10px] font-black uppercase tracking-wider shadow-sm flex items-center justify-center gap-1 mx-auto"
                 title="Traiter le remboursement"
+              >
+                Traiter
+              </button>
+            )}
+          />
+        </div>
+      ) : activeTab === 'reductions' ? (
+        // TAB 2.4.5 — Discount (Reduction) Requests
+        <div className="space-y-6">
+          <DataTable
+            title="Demandes de réduction en attente"
+            columns={discountRequestColumns}
+            data={paginatedDiscountRequests}
+            loading={loadingDiscountRequests}
+            onSearch={onSearchDiscountRequests}
+            searchPlaceholder="Rechercher par patient ou facture..."
+            entryLabel="demandes"
+            pagination={discountRequestsPagination}
+            extraActions={(row) => (
+              <button
+                onClick={() => setSelectedDiscountRequest(row)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded text-[10px] font-black uppercase tracking-wider shadow-sm flex items-center justify-center gap-1 mx-auto"
+                title="Traiter la demande de réduction"
               >
                 Traiter
               </button>
@@ -1987,7 +2223,7 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
       )}
       {/* Refund Modal Dialog */}
       {selectedRefund && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity">
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
             <div className="bg-slate-900 p-5 text-white flex justify-between items-center">
               <div>
@@ -2045,6 +2281,167 @@ const MaSessionView = ({ showToast, initialTab = 'ma-session' }) => {
                 >
                   {processingRefund ? <RefreshCw className="animate-spin" size={14} /> : <Check size={14} />}
                   Valider le Remboursement
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cashier Discount Request Modal */}
+      {selectedInvoiceForDiscount && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
+            {/* Header */}
+            <div className="bg-slate-900 p-5 text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-widest text-amber-400">Demander une réduction</h3>
+                <p className="text-[11px] text-slate-300 font-bold mt-1">Facture Réf : <span className="font-mono">{selectedInvoiceForDiscount.invoiceRef}</span></p>
+              </div>
+              <button onClick={() => setSelectedInvoiceForDiscount(null)} className="text-slate-400 hover:text-white transition-colors">
+                <XCircle size={20} />
+              </button>
+            </div>
+
+            {/* Content / Form */}
+            <form onSubmit={handleCreateDiscountRequest} className="p-6 space-y-6">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/50 space-y-2.5">
+                <div className="flex justify-between text-xs font-bold text-slate-500">
+                  <span>Patient :</span>
+                  <span className="text-slate-800">{selectedInvoiceForDiscount.patientName}</span>
+                </div>
+                <div className="flex justify-between text-xs font-bold text-slate-500">
+                  <span>Montant Net Initial (Patient) :</span>
+                  <span className="text-slate-800">{formatCurrency(selectedInvoiceForDiscount.patientAmount)} FCFA</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-2">Montant proposé par le patient (FCFA) *</label>
+                <input
+                  type="number"
+                  min="0"
+                  max={selectedInvoiceForDiscount.patientAmount - 1}
+                  value={proposedDiscountAmount}
+                  onChange={e => setProposedDiscountAmount(e.target.value)}
+                  placeholder="Saisissez le montant proposé..."
+                  className="w-full border-2 border-slate-200 rounded-lg p-3 text-sm font-bold bg-slate-50 outline-none focus:border-sky-500 text-slate-800"
+                  required
+                />
+              </div>
+
+              {Number(proposedDiscountAmount) > 0 && Number(proposedDiscountAmount) < selectedInvoiceForDiscount.patientAmount && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+                  <div className="flex justify-between text-xs font-bold text-amber-800">
+                    <span>Réduction calculée :</span>
+                    <span>{formatCurrency(selectedInvoiceForDiscount.patientAmount - Number(proposedDiscountAmount))} FCFA</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-bold text-amber-800">
+                    <span>Pourcentage indicatif :</span>
+                    <span>
+                      {((selectedInvoiceForDiscount.patientAmount - Number(proposedDiscountAmount)) / selectedInvoiceForDiscount.patientAmount * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedInvoiceForDiscount(null)}
+                  className="flex-1 border-2 border-slate-200 text-slate-500 hover:bg-slate-50 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingDiscount || !proposedDiscountAmount || Number(proposedDiscountAmount) >= selectedInvoiceForDiscount.patientAmount}
+                  className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 text-white py-3 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  {submittingDiscount ? <RefreshCw className="animate-spin" size={14} /> : <Check size={14} />}
+                  Soumettre la demande
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Admin/Accountant Discount Validation Modal */}
+      {selectedDiscountRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
+            {/* Header */}
+            <div className="bg-slate-900 p-5 text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-widest text-indigo-400">Traiter la demande de réduction</h3>
+                <p className="text-[11px] text-slate-300 font-bold mt-1">Facture Réf : <span className="font-mono">{selectedDiscountRequest.invoiceRef}</span></p>
+              </div>
+              <button onClick={() => setSelectedDiscountRequest(null)} className="text-slate-400 hover:text-white transition-colors">
+                <XCircle size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6">
+              {/* Patient info & stats */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/50 space-y-2">
+                <h4 className="text-[10px] text-slate-400 font-black uppercase tracking-wider mb-1.5 border-b border-slate-200 pb-1">Informations Patient & Historique</h4>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500 font-medium">Patient :</span>
+                  <span className="font-black text-slate-800">{selectedDiscountRequest.patientName || 'Patient inconnu'}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500 font-medium">Code Patient :</span>
+                  <span className="font-bold text-slate-700 font-mono">{selectedDiscountRequest.patientCode || 'PAT-XXXX'}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500 font-medium">Nombre total de prestations :</span>
+                  <span className="font-bold text-slate-700">{selectedDiscountRequest.patientTotalPrestations || 0}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500 font-medium">Montant total des prestations (CA) :</span>
+                  <span className="font-bold text-indigo-600 font-mono">{formatCurrency(selectedDiscountRequest.patientTotalAmount)} FCFA</span>
+                </div>
+              </div>
+
+              {/* Discount details */}
+              <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 space-y-2.5">
+                <h4 className="text-[10px] text-indigo-700 font-black uppercase tracking-wider mb-1 pb-1 border-b border-indigo-100/50">Détails Financiers</h4>
+                <div className="flex justify-between text-xs font-bold text-slate-600">
+                  <span>Montant de la prestation actuelle (Patient) :</span>
+                  <span>{formatCurrency(selectedDiscountRequest.originalPatientAmount)} FCFA</span>
+                </div>
+                <div className="flex justify-between text-xs font-bold text-rose-600">
+                  <span>Réduction demandée :</span>
+                  <span>-{formatCurrency(selectedDiscountRequest.discountAmount)} FCFA ({selectedDiscountRequest.discountPercent}%)</span>
+                </div>
+                <hr className="border-indigo-100/50 my-1" />
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-black text-slate-800 uppercase tracking-wider">Montant Final à Payer (Patient) :</span>
+                  <span className="text-base font-black text-indigo-700 font-mono">{formatCurrency(selectedDiscountRequest.proposedPatientAmount)} FCFA</span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => handleResolveDiscountRequest('REJECTED')}
+                  disabled={processingDiscountValidation}
+                  className="flex-1 py-3 bg-rose-50 hover:bg-rose-100 disabled:opacity-50 text-rose-700 border border-rose-200 font-black uppercase text-[10px] tracking-widest rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                >
+                  {processingDiscountValidation ? <RefreshCw className="animate-spin" size={14} /> : <XCircle size={14} />}
+                  Rejeter la demande
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleResolveDiscountRequest('APPROVED')}
+                  disabled={processingDiscountValidation}
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black uppercase text-[10px] tracking-widest rounded-lg shadow-lg shadow-emerald-600/10 transition-colors flex items-center justify-center gap-1.5"
+                >
+                  {processingDiscountValidation ? <RefreshCw className="animate-spin" size={14} /> : <Check size={14} />}
+                  Accepter la demande
                 </button>
               </div>
             </div>

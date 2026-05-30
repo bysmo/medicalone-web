@@ -9,6 +9,7 @@ import com.altes.alphacure.patient.entity.enums.InvoiceStatus;
 import com.altes.alphacure.patient.exception.PatientNotFoundException;
 import com.altes.alphacure.patient.repository.InvoiceLineRepository;
 import com.altes.alphacure.patient.repository.InvoiceRepository;
+import com.altes.alphacure.patient.repository.DiscountRequestRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ public class InvoiceService {
 
     private final InvoiceRepository invoiceRepository;
     private final InvoiceLineRepository invoiceLineRepository;
+    private final DiscountRequestRepository discountRequestRepository;
     private final com.altes.alphacure.patient.repository.PatientRepository patientRepository;
     private final ClinicClient clinicClient;
     private final com.altes.alphacure.patient.security.ClinicContextHolder clinicContextHolder;
@@ -108,6 +110,9 @@ public class InvoiceService {
     }
 
     public Invoice payInvoice(UUID id) {
+        if (discountRequestRepository.existsByInvoiceIdAndStatus(id, com.altes.alphacure.patient.entity.enums.ValidationStatus.PENDING)) {
+            throw new IllegalStateException("Paiement impossible : une demande de réduction est en cours pour cette facture.");
+        }
         Invoice invoice = getInvoiceById(id);
         if (invoice.getStatus() == InvoiceStatus.PAID) {
             throw new IllegalStateException("Cette facture est déjà payée.");

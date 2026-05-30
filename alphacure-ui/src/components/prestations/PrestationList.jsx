@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   CreditCard, ChevronRight,
-  Stethoscope, FlaskConical, X, Trash2, Eye, Loader2
+  Stethoscope, FlaskConical, X, Trash2, Eye, Loader2, CheckCircle2
 } from 'lucide-react';
 import { LAB_EXAMS, formatCurrency } from '../../data/constants';
-import { prestationService, practitionerService, patientService, invoiceService, medicalActService, medicalService } from '../../services/api';
+import { prestationService, practitionerService, patientService, invoiceService, medicalActService, medicalService, externalPrescribingDoctorService } from '../../services/api';
 import { filterEligiblePractitioners } from '../../utils/specialtyUtils';
 import DataTable from '../ui/DataTable';
 
@@ -22,13 +22,20 @@ const MEDICAL_STATUS_CONFIG = {
   'ABANDONNE': { label: 'Abandonné', bg: 'bg-slate-100 border-slate-200', text: 'text-slate-500' }
 };
 
+const getTodayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 const PrestationsView = ({ showToast }) => {
   const [prestations, setPrestations] = useState([]);
   const [practitioners, setPractitioners] = useState([]);
+  const [externalDoctors, setExternalDoctors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [financialFilter, setFinancialFilter] = useState('all');
   const [medicalFilter, setMedicalFilter] = useState('all');
-  const [todayOnly, setTodayOnly] = useState(true);
+  const [startDate, setStartDate] = useState(getTodayStr());
+  const [endDate, setEndDate] = useState(getTodayStr());
   const [searchTerm, setSearchTerm] = useState('');
   const [actionModal, setActionModal] = useState(null);
   const [motif, setMotif] = useState('');
@@ -37,22 +44,29 @@ const PrestationsView = ({ showToast }) => {
   const [affectModal, setAffectModal] = useState(null);
   const [eligiblePractitioners, setEligiblePractitioners] = useState([]);
   const [eligibleLoading, setEligibleLoading] = useState(false);
+  const [validateSeanceModal, setValidateSeanceModal] = useState(null); // prestation obj
+  const [validatePractitionerId, setValidatePractitionerId] = useState('');
+  const [validatingSeance, setValidatingSeance] = useState(false);
+  const [prescribingDoctorFilter, setPrescribingDoctorFilter] = useState('all');
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       // Load all necessary details in parallel
-      const [prestRes, practRes, patientsRes, invoicesRes, actsRes, consultationsRes] = await Promise.all([
-        todayOnly ? prestationService.getToday() : prestationService.getAll(),
+      const [prestRes, practRes, patientsRes, invoicesRes, actsRes, consultationsRes, extDocsRes] = await Promise.all([
+        prestationService.getAll(),
         practitionerService.getAll(),
         patientService.search('', 0, 1000),
         invoiceService.getAll(),
         medicalActService.getAll(),
-        medicalService.getAllConsultations().catch(() => ({ data: [] }))
+        medicalService.getAllConsultations().catch(() => ({ data: [] })),
+        externalPrescribingDoctorService.getAll().catch(() => ({ data: [] }))
       ]);
 
       const loadedPractitioners = practRes.data || [];
       setPractitioners(loadedPractitioners);
+      const loadedExtDoctors = extDocsRes.data || [];
+      setExternalDoctors(loadedExtDoctors);
 
       const loadedPatients = patientsRes.data.content || [];
       const loadedInvoices = invoicesRes.data || [];
@@ -64,7 +78,8 @@ const PrestationsView = ({ showToast }) => {
       const mappedPrestations = rawPrestations.map(line => {
         const matchedPractitioner = loadedPractitioners.find(pr => pr.id === line.practitionerId);
         const matchedInvoice = loadedInvoices.find(inv => inv.id === line.invoiceId);
-        const matchedPatient = matchedInvoice ? loadedPatients.find(pat => pat.id === matchedInvoice.patientId) : null;
+        const patientId = line.patientId || (matchedInvoice ? matchedInvoice.patientId : null);
+        const matchedPatient = patientId ? loadedPatients.find(pat => pat.id === patientId) : null;
         const matchedAct = loadedActs.find(act => act.id === line.actId);
 
         // Map Financial Status: REGLE, NON_REGLE, REMBOURSE
@@ -98,6 +113,7 @@ const PrestationsView = ({ showToast }) => {
         return {
           id: line.id,
           actId: line.actId,
+          patientId,
           invoiceRef: matchedInvoice ? matchedInvoice.invoiceRef : ('FAC-' + line.invoiceId.substring(0, 6)),
           patientName: matchedPatient ? matchedPatient.fullName : 'Patient inconnu',
           patientCode: matchedPatient ? matchedPatient.patientCode : 'PAT-XXXX',
@@ -109,6 +125,10 @@ const PrestationsView = ({ showToast }) => {
           financialStatus,
           medicalStatus,
           practitionerId: line.practitionerId,
+          prescribingDoctorId: matchedInvoice ? matchedInvoice.prescribingDoctorId : null,
+          prescribingDoctorName: matchedInvoice && matchedInvoice.prescribingDoctorId
+            ? (() => { const pr = loadedExtDoctors.find(p => p.id === matchedInvoice.prescribingDoctorId); return pr ? pr.fullName : null; })()
+            : null,
           practitioner: matchedPractitioner ? matchedPractitioner.fullName : null,
           date: line.createdAt ? line.createdAt.split('T')[0] : '',
           time: line.createdAt ? line.createdAt.split('T')[1].substring(0, 5) : '00:00',
@@ -120,7 +140,6 @@ const PrestationsView = ({ showToast }) => {
       });
 
       // Map consultations (scheduled sessions and controls)
-      const todayStr = new Date().toISOString().split('T')[0];
       const mappedConsultations = rawConsultations
         .filter(cons => {
           const nature = (cons.nature || '').toUpperCase();
@@ -128,13 +147,7 @@ const PrestationsView = ({ showToast }) => {
           const isScheduledSeance = nature === 'SEANCES';
           const isScheduledControl = nature === 'CONSULTATIONS' && actName.startsWith('Contrôle:');
           
-          if (!isScheduledSeance && !isScheduledControl) return false;
-
-          // If todayOnly, only show those created today
-          if (todayOnly) {
-            return cons.createdAt && cons.createdAt.split('T')[0] === todayStr;
-          }
-          return true;
+          return isScheduledSeance || isScheduledControl;
         })
         .map(cons => {
           const matchedPractitioner = loadedPractitioners.find(pr => pr.id === cons.practitionerId);
@@ -167,6 +180,7 @@ const PrestationsView = ({ showToast }) => {
             id: cons.id,
             isConsultation: true,
             actId: parentLine ? parentLine.actId : null,
+            patientId: cons.patientId,
             invoiceRef: invoiceRef,
             patientName: matchedPatient ? matchedPatient.fullName : 'Patient inconnu',
             patientCode: matchedPatient ? matchedPatient.patientCode : 'PAT-XXXX',
@@ -202,7 +216,7 @@ const PrestationsView = ({ showToast }) => {
     } finally {
       setLoading(false);
     }
-  }, [todayOnly, showToast]); // Reload from backend only when date filter changes
+  }, [showToast]); // Reload from backend only when date filter changes
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -211,7 +225,13 @@ const PrestationsView = ({ showToast }) => {
 
   const fmt = formatCurrency;
 
-  const filtered = prestations.filter(p => {
+  const dateFilteredPrestations = prestations.filter(p => {
+    if (startDate && p.date < startDate) return false;
+    if (endDate && p.date > endDate) return false;
+    return true;
+  });
+
+  const filtered = dateFilteredPrestations.filter(p => {
     // 1. Filter by financial status
     if (financialFilter !== 'all' && p.financialStatus !== financialFilter) {
       return false;
@@ -220,7 +240,11 @@ const PrestationsView = ({ showToast }) => {
     if (medicalFilter !== 'all' && p.medicalStatus !== medicalFilter) {
       return false;
     }
-    // 3. Filter by search term
+    // 3. Filter by prescribing doctor
+    if (prescribingDoctorFilter !== 'all' && p.prescribingDoctorId !== prescribingDoctorFilter) {
+      return false;
+    }
+    // 4. Filter by search term
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
       return p.patientName.toLowerCase().includes(s) || p.actName.toLowerCase().includes(s) || p.invoiceRef.toLowerCase().includes(s) || p.patientCode.toLowerCase().includes(s);
@@ -232,12 +256,12 @@ const PrestationsView = ({ showToast }) => {
   const totalPrestPages = Math.ceil(totalFiltered / prestPageSize) || 1;
   const paginatedData = filtered.slice(prestPage * prestPageSize, (prestPage + 1) * prestPageSize);
 
-  const financialCounts = prestations.reduce((acc, p) => {
+  const financialCounts = dateFilteredPrestations.reduce((acc, p) => {
     acc[p.financialStatus] = (acc[p.financialStatus] || 0) + 1;
     return acc;
   }, {});
 
-  const medicalCounts = prestations.reduce((acc, p) => {
+  const medicalCounts = dateFilteredPrestations.reduce((acc, p) => {
     acc[p.medicalStatus] = (acc[p.medicalStatus] || 0) + 1;
     return acc;
   }, {});
@@ -318,6 +342,32 @@ const PrestationsView = ({ showToast }) => {
     }
   };
 
+  const handleValidateSeance = async () => {
+    if (!validatePractitionerId) {
+      showToast('Veuillez sélectionner un praticien réalisateur.', 'error');
+      return;
+    }
+    setValidatingSeance(true);
+    try {
+      const payload = {
+        prestationId: validateSeanceModal.id,
+        patientId: validateSeanceModal.patientId,
+        practitionerId: validatePractitionerId,
+        actName: validateSeanceModal.actName,
+      };
+      await medicalService.validateSeance(payload);
+      showToast('Séance validée avec succès !', 'success');
+      setValidateSeanceModal(null);
+      setValidatePractitionerId('');
+      loadData();
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.response?.data?.message || 'Erreur lors de la validation.';
+      showToast(msg, 'error');
+    } finally {
+      setValidatingSeance(false);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-3">
@@ -327,10 +377,40 @@ const PrestationsView = ({ showToast }) => {
       {/* Status Filter Pills */}
       <div className="space-y-3 bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => setTodayOnly(!todayOnly)}
-            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border ${todayOnly ? 'bg-sky-600 text-white border-sky-600 shadow-lg' : 'bg-white text-slate-500 border-slate-200'}`}>
-            {todayOnly ? '📅 Aujourd\'hui' : '📅 Toutes les dates'}
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Du</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => { setStartDate(e.target.value); setPrestPage(0); }}
+                className="bg-transparent text-[10px] font-black text-slate-700 outline-none cursor-pointer border-none p-0 focus:ring-0"
+              />
+            </div>
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Au</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => { setEndDate(e.target.value); setPrestPage(0); }}
+                className="bg-transparent text-[10px] font-black text-slate-700 outline-none cursor-pointer border-none p-0 focus:ring-0"
+              />
+            </div>
+            {(startDate !== getTodayStr() || endDate !== getTodayStr()) && (
+              <button
+                onClick={() => {
+                  const today = getTodayStr();
+                  setStartDate(today);
+                  setEndDate(today);
+                  setPrestPage(0);
+                }}
+                className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-slate-100 rounded transition-all"
+                title="Réinitialiser à aujourd'hui"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
           <div className="w-px h-6 bg-slate-200 mx-1"></div>
           
           <span className="text-[10px] font-black uppercase text-slate-450 mr-2">Suivi financier :</span>
@@ -358,6 +438,28 @@ const PrestationsView = ({ showToast }) => {
               {cfg.label} ({medicalCounts[key] || 0})
             </button>
           ))}
+        </div>
+
+        {/* Filtre Médecin Prescripteur */}
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+          <span className="text-[10px] font-black uppercase text-slate-450 mr-2 flex items-center gap-1">
+            <Stethoscope size={10} /> Médecin prescripteur :
+          </span>
+          <select
+            value={prescribingDoctorFilter}
+            onChange={e => { setPrescribingDoctorFilter(e.target.value); setPrestPage(0); }}
+            className="bg-white border border-slate-200 rounded-full px-3 py-1.5 text-[10px] font-bold outline-none text-slate-700 cursor-pointer"
+          >
+            <option value="all">Tous les prescripteurs</option>
+            {externalDoctors.filter(pr => dateFilteredPrestations.some(p => p.prescribingDoctorId === pr.id)).map(pr => (
+              <option key={pr.id} value={pr.id}>{pr.fullName}</option>
+            ))}
+          </select>
+          {prescribingDoctorFilter !== 'all' && (
+            <button onClick={() => setPrescribingDoctorFilter('all')} className="p-1 text-slate-400 hover:text-rose-500 hover:bg-slate-100 rounded transition-all">
+              <X size={12} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -430,6 +532,16 @@ const PrestationsView = ({ showToast }) => {
         entryLabel="prestations"
         extraActions={(p) => (
           <>
+            {/* Bouton Valider Séance — uniquement pour les séances non encore réalisées */}
+            {p.nature === 'SEANCES' && p.medicalStatus !== 'REALISE' && p.medicalStatus !== 'ANNULE' && (
+              <button
+                onClick={() => { setValidateSeanceModal(p); setValidatePractitionerId(''); }}
+                title="Valider la séance"
+                className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded border border-emerald-600 shadow-sm transition-colors inline-flex items-center gap-1 text-[9px] font-black uppercase px-2"
+              >
+                <CheckCircle2 size={12} /> Valider
+              </button>
+            )}
             {!p.practitioner && (p.status === 'en_attente' || p.status === 'reglee') && p.nature !== 'EXAMENS' && p.nature !== 'Examens' && (
               <button onClick={() => openAffectModal(p)} title="Affecter praticien" className="p-1.5 bg-white hover:bg-sky-100 text-sky-600 rounded border border-slate-200 shadow-sm transition-colors">
                 <Stethoscope size={13} />
@@ -567,8 +679,72 @@ const PrestationsView = ({ showToast }) => {
           </div>
         );
       })()}
+
+      {/* Modale Validation Séance */}
+      {validateSeanceModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
+            <div className="bg-emerald-700 p-4 flex justify-between items-center">
+              <h3 className="text-white text-[11px] font-black uppercase tracking-widest flex items-center gap-2">
+                <CheckCircle2 size={14} /> Valider la séance réalisée
+              </h3>
+              <button onClick={() => setValidateSeanceModal(null)} className="text-white/60 hover:text-white"><X size={18} /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-sm">
+                <div className="font-bold text-slate-800">{validateSeanceModal.actName}</div>
+                <div className="text-[11px] text-slate-500">{validateSeanceModal.patientName} — {validateSeanceModal.invoiceRef}</div>
+                <div className="text-[10px] text-slate-400 mt-1">{fmt(validateSeanceModal.price)}</div>
+              </div>
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-[11px] text-emerald-700 font-bold">
+                ✔ Cette action confirmera que la séance a été réalisée et la marquera comme TERMINÉE.
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest block mb-2">Praticien réalisateur *</label>
+                {(() => {
+                  const eligible = filterEligiblePractitioners(practitioners, {
+                    specialty: validateSeanceModal.specialty,
+                    actName: validateSeanceModal.actName,
+                  });
+                  if (eligible.length === 0) {
+                    return (
+                      <div className="bg-rose-50 border border-rose-100 rounded-lg p-3 text-[11px] text-rose-700 font-bold">
+                        ⚠ Aucun praticien de la spécialité de cet acte n'est enregistré.
+                      </div>
+                    );
+                  }
+                  return (
+                    <select
+                      value={validatePractitionerId}
+                      onChange={e => setValidatePractitionerId(e.target.value)}
+                      className="w-full border border-slate-200 rounded-lg p-3 text-sm outline-none focus:border-emerald-500 bg-white"
+                    >
+                      <option value="">-- Sélectionner le praticien --</option>
+                      {eligible.map(pr => (
+                        <option key={pr.id} value={pr.id}>{pr.fullName}</option>
+                      ))}
+                    </select>
+                  );
+                })()}
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setValidateSeanceModal(null)} className="flex-1 bg-slate-200 text-slate-600 py-2.5 rounded-lg text-[10px] font-bold uppercase hover:bg-slate-300 transition-colors">Annuler</button>
+                <button
+                  onClick={handleValidateSeance}
+                  disabled={validatingSeance || !validatePractitionerId}
+                  className="flex-1 py-2.5 rounded-lg text-[10px] font-bold uppercase text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-1 shadow-md"
+                >
+                  {validatingSeance && <Loader2 size={12} className="animate-spin" />}
+                  Confirmer la séance
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
 
 export default PrestationsView;

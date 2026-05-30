@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Search, Plus, CreditCard, X, Trash2,
+  Search, Plus, CreditCard, X, Trash2, Save,
   Stethoscope, FlaskConical, HeartPulse,
   ShieldCheck, CheckCircle2, Loader2, Info, AlertTriangle
 } from 'lucide-react';
 import { TARIFF_TYPES, formatCurrency } from '../../data/constants';
-import { medicalActService, invoiceService, nomenclatureService, conventionService, insuranceService } from '../../services/api';
+import { medicalActService, invoiceService, nomenclatureService, conventionService, insuranceService, externalPrescribingDoctorService } from '../../services/api';
 
 const BillingView = ({ patient, onClose, showToast }) => {
   const [natures, setNatures] = useState([]);
@@ -24,6 +24,13 @@ const BillingView = ({ patient, onClose, showToast }) => {
   const [subscribers, setSubscribers] = useState([]);
   const [loadingActs, setLoadingActs] = useState(false);
   const [savingInvoice, setSavingInvoice] = useState(false);
+  const [externalDoctors, setExternalDoctors] = useState([]);
+  const [prescribingDoctorId, setPrescribingDoctorId] = useState('');
+  const [showAddDoctorModal, setShowAddDoctorModal] = useState(false);
+  const [newDoctorName, setNewDoctorName] = useState('');
+  const [newDoctorSpecialty, setNewDoctorSpecialty] = useState('');
+  const [newDoctorPhone, setNewDoctorPhone] = useState('');
+  const [creatingDoctor, setCreatingDoctor] = useState(false);
 
   // Load initial nomenclatures (Natures of acts, Tariffs, Insurers)
   useEffect(() => {
@@ -71,6 +78,8 @@ const BillingView = ({ patient, onClose, showToast }) => {
       }
     };
     loadNomenclatures();
+    // Load external prescribing doctors
+    externalPrescribingDoctorService.getAll().then(res => setExternalDoctors(res.data || [])).catch(() => {});
   }, []);
 
   // Load acts dynamically from backend for the selected activeNature
@@ -249,6 +258,7 @@ const BillingView = ({ patient, onClose, showToast }) => {
         tariffType: activeTariff,
         coverageRate: inCoveragePeriod ? coverageRate : 0,
         bordereauCode: bordereauCode || null,
+        prescribingDoctorId: prescribingDoctorId || null,
         lines: cart.map(item => ({
             actId: item.actId,
             actName: item.name,
@@ -267,6 +277,32 @@ const BillingView = ({ patient, onClose, showToast }) => {
         showToast("Erreur lors de la validation de la facture.", "error");
     } finally {
         setSavingInvoice(false);
+    }
+  };
+
+  const handleCreateExternalDoctor = async (e) => {
+    e.preventDefault();
+    if (!newDoctorName.trim()) return;
+    setCreatingDoctor(true);
+    try {
+      const res = await externalPrescribingDoctorService.create({
+        fullName: newDoctorName.trim(),
+        specialty: newDoctorSpecialty.trim() || null,
+        phone: newDoctorPhone.trim() || null
+      });
+      showToast("Médecin prescripteur créé avec succès !", "success");
+      const created = res.data;
+      setExternalDoctors(prev => [...prev, created].sort((a, b) => a.fullName.localeCompare(b.fullName)));
+      setPrescribingDoctorId(created.id);
+      setShowAddDoctorModal(false);
+      setNewDoctorName('');
+      setNewDoctorSpecialty('');
+      setNewDoctorPhone('');
+    } catch (err) {
+      console.error(err);
+      showToast("Erreur lors de la création du médecin prescripteur", "error");
+    } finally {
+      setCreatingDoctor(false);
     }
   };
 
@@ -484,6 +520,35 @@ const BillingView = ({ patient, onClose, showToast }) => {
               <div>Dossier: <span className="text-white font-mono">{patient?.dossierNumber || '---'}</span></div>
               <div>Genre: <span className="text-white">{patient?.gender === 'M' ? 'Masculin' : 'Féminin'}</span></div>
             </div>
+
+            {/* Médecin Prescripteur */}
+            <div className="mt-3 pt-3 border-t border-white/10">
+              <div className="text-[9px] font-black uppercase tracking-widest text-sky-400 mb-1.5 flex items-center gap-1">
+                <Stethoscope size={10} /> Médecin Prescripteur
+              </div>
+              <div className="flex gap-1.5">
+                <select
+                  value={prescribingDoctorId}
+                  onChange={e => setPrescribingDoctorId(e.target.value)}
+                  className="flex-1 bg-white/10 border border-white/20 rounded p-1.5 text-[11px] text-white outline-none focus:border-sky-400 truncate cursor-pointer"
+                >
+                  <option value="">-- Sélectionner --</option>
+                  {externalDoctors.map(pr => (
+                    <option key={pr.id} value={pr.id} style={{ color: '#1e293b' }}>
+                      {pr.fullName} {pr.specialty ? `(${pr.specialty})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setShowAddDoctorModal(true)}
+                  title="Créer un nouveau médecin prescripteur"
+                  className="p-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded border border-sky-600 shadow-sm transition-colors cursor-pointer flex items-center justify-center shrink-0"
+                >
+                  <Plus size={12} />
+                </button>
+              </div>
+            </div>
           </div>
 
           {isEffectivelyInsured ? (
@@ -594,6 +659,72 @@ const BillingView = ({ patient, onClose, showToast }) => {
           </div>
         </div>
       </div>
+
+      {/* Modale de création médecin prescripteur externe */}
+      {showAddDoctorModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden animate-scale-in">
+            <div className="bg-sky-800 p-4 flex justify-between items-center">
+              <h3 className="text-white text-[11px] font-black uppercase tracking-widest flex items-center gap-2">
+                <Plus size={14} /> Nouveau Médecin Prescripteur
+              </h3>
+              <button type="button" onClick={() => setShowAddDoctorModal(false)} className="text-white/60 hover:text-white">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateExternalDoctor} className="p-6 space-y-4">
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest block mb-1.5">Nom complet *</label>
+                <input
+                  type="text"
+                  required
+                  value={newDoctorName}
+                  onChange={e => setNewDoctorName(e.target.value)}
+                  placeholder="Dr. Jean Dupont..."
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-sky-500 bg-white text-slate-700 font-bold"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest block mb-1.5">Spécialité</label>
+                <input
+                  type="text"
+                  value={newDoctorSpecialty}
+                  onChange={e => setNewDoctorSpecialty(e.target.value)}
+                  placeholder="Cardiologie, Généraliste..."
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-sky-500 bg-white text-slate-700"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest block mb-1.5">Téléphone</label>
+                <input
+                  type="text"
+                  value={newDoctorPhone}
+                  onChange={e => setNewDoctorPhone(e.target.value)}
+                  placeholder="+226 70 00 00 00..."
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-sky-500 bg-white text-slate-700"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddDoctorModal(false)}
+                  className="flex-1 bg-slate-100 text-slate-600 py-2.5 rounded-lg text-[10px] font-bold uppercase hover:bg-slate-200 transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingDoctor || !newDoctorName.trim()}
+                  className="flex-1 py-2.5 rounded-lg text-[10px] font-bold uppercase text-white bg-sky-600 hover:bg-sky-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-1 shadow-md cursor-pointer"
+                >
+                  {creatingDoctor ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                  Enregistrer
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

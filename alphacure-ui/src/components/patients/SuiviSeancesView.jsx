@@ -83,7 +83,7 @@ const SuiviSeancesView = ({ showToast }) => {
           try {
             const res = await medicalService.getPatientHistory(patId);
             return { patId, consultations: res.data || [] };
-          } catch (e) {
+          } catch {
             return { patId, consultations: [] };
           }
         })
@@ -174,11 +174,6 @@ const SuiviSeancesView = ({ showToast }) => {
   };
 
   const handleConfirmSchedule = async () => {
-    if (!selectedPractitionerId) {
-      showToast("Veuillez sélectionner un praticien.", "error");
-      return;
-    }
-
     setScheduling(true);
     try {
       const isSeance = activeTab === 'seances';
@@ -186,7 +181,7 @@ const SuiviSeancesView = ({ showToast }) => {
       const payload = {
         prestationId: selectedItem.id,
         patientId: selectedItem.patientId,
-        practitionerId: selectedPractitionerId,
+        practitionerId: selectedPractitionerId || null,
         nature: isSeance ? 'SEANCES' : 'CONSULTATIONS',
         actName: isSeance ? `Séance: ${selectedItem.actName}` : `Contrôle: ${selectedItem.actName}`,
         forceNew: "true"
@@ -472,7 +467,7 @@ const SuiviSeancesView = ({ showToast }) => {
               </div>
 
               <div>
-                <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest block mb-2">Choisir le Praticien éligible *</label>
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest block mb-2">Choisir le Praticien éligible (Optionnel)</label>
                 <select
                   value={selectedPractitionerId}
                   onChange={e => setSelectedPractitionerId(e.target.value)}
@@ -500,9 +495,9 @@ const SuiviSeancesView = ({ showToast }) => {
                 >
                   Annuler
                 </button>
-                <button
+                 <button
                   onClick={handleConfirmSchedule}
-                  disabled={scheduling || !selectedPractitionerId}
+                  disabled={scheduling}
                   className="flex-1 py-2.5 rounded-lg text-[10px] font-bold uppercase text-white bg-sky-600 hover:bg-sky-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-1 shadow-md"
                 >
                   {scheduling && <Loader2 size={12} className="animate-spin" />}

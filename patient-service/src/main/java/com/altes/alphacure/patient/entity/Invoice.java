@@ -53,6 +53,10 @@ public class Invoice {
     @Column(name = "bordereau_code", length = 50)
     private String bordereauCode;
 
+    @Column(name = "prescribing_doctor_id", columnDefinition = "CHAR(36)")
+    @org.hibernate.annotations.JdbcTypeCode(java.sql.Types.VARCHAR)
+    private UUID prescribingDoctorId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default

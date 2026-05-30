@@ -193,4 +193,27 @@ public class MedicalConsultationController {
         consultationService.deleteConsultation(id, clinicId);
         return ResponseEntity.noContent().build();
     }
+
+    /**
+     * POST /api/v1/medical/validate-seance
+     * Body: {prestationId, patientId, practitionerId, actName}
+     * Crée la consultation si inexistante (avec forceNew pour SEANCES),
+     * puis la finalise directement en TERMINEE.
+     */
+    @PostMapping("/validate-seance")
+    @PreAuthorize("hasAnyRole('MEDECIN','INFIRMIER','RECEPTIONNISTE','ADMIN','MANAGER_CLINIQUE')")
+    public ResponseEntity<Consultation> validateSeance(@RequestBody Map<String, String> body) {
+        UUID clinicId = clinicContextHolder.getClinicId();
+        UUID prestationId  = parseUUID(body.get("prestationId"));
+        UUID patientId     = parseUUID(body.get("patientId"));
+        UUID practitionerId = parseUUID(body.get("practitionerId"));
+        String actName = body.getOrDefault("actName", "Séance");
+
+        if (patientId == null || practitionerId == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Consultation saved = consultationService.validateSeance(prestationId, patientId, practitionerId, clinicId, actName);
+        return ResponseEntity.ok(saved);
+    }
 }

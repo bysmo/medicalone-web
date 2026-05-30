@@ -1,224 +1,378 @@
-/* 🎨 CUSTOM KEYCLOAK LOGIN THEME - ALPHACURE CLINIC */
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+/* ═══════════════════════════════════════════════════════════════
+   🏥 ALPHACURE - KEYCLOAK LOGIN THEME
+   Palette : Navy-Teal (#0a1929), Teal (#1a7f97), Vert (#1a7a47)
+   Règle  : Zéro dégradé de couleur. Design plat premium.
+═══════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
-/* 🌌 Fond d'écran global avec dégradé radial et animation de brume lumineuse */
+/* ── Variables de la palette AlphaCure ── */
+:root {
+  --ac-bg:          #f4f6f8;
+  --ac-surface:     #ffffff;
+  --ac-card:        rgba(255, 255, 255, 0.88);
+  --ac-border:      rgba(26, 127, 151, 0.2);
+  --ac-border-soft: rgba(0, 0, 0, 0.06);
+  --ac-teal:        #1a7f97;
+  --ac-teal-light:  #135f72;
+  --ac-teal-dark:   #0f4c5a;
+  --ac-green:       #1a7a47;
+  --ac-text:        #1e293b;
+  --ac-text-muted:  #5e6e82;
+  --ac-red:         #c0392b;
+  --ac-red-soft:    rgba(192, 57, 43, 0.06);
+  --ac-green-soft:  rgba(26, 122, 71, 0.06);
+}
+
+/* ── Fond global — image de clinique avec cache uni ── */
 body {
-    background: radial-gradient(circle at 20% 30%, #1e1b4b 0%, #0f172a 70%, #020617 100%) !important;
-    font-family: 'Outfit', sans-serif !important;
-    color: #e2e8f0 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    min-height: 100vh !important;
-    margin: 0 !important;
+  background-image: url('../img/clinic_bg.png') !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  font-family: 'Inter', sans-serif !important;
+  color: var(--ac-text) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 100vh !important;
+  margin: 0 !important;
+  padding: 1.5rem !important;
+  box-sizing: border-box !important;
+  position: relative !important;
 }
 
-/* 🧊 Carte de connexion en verre (Sleek Glassmorphism) */
+body::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  background-color: rgba(255, 255, 255, 0.35) !important; /* Cache blanc uni, aucun dégradé */
+  backdrop-filter: blur(8px) !important; /* Flou d'arrière-plan */
+  z-index: 0 !important;
+}
+
+/* ── Wrapper page Keycloak ── */
 .login-pf-page {
-    background: transparent !important;
-    box-shadow: none !important;
-    padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 100vh !important;
+  position: relative !important;
+  z-index: 1 !important;
 }
 
-#kc-card-wrapper {
-    background: rgba(15, 23, 42, 0.45) !important;
-    backdrop-filter: blur(20px) !important;
-    -webkit-backdrop-filter: blur(20px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: 24px !important;
-    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 
-                inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
-    padding: 3rem 2.5rem !important;
-    width: 100% !important;
-    max-width: 440px !important;
-    box-sizing: border-box !important;
-    margin: 0 auto !important;
-    position: relative !important;
+#kc-content, #kc-content-wrapper {
+  background: transparent !important;
+  box-shadow: none !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
-/* Bordure lumineuse décorative sur le dessus de la carte */
-#kc-card-wrapper::before {
-    content: '' !important;
-    position: absolute !important;
-    top: 0 !important;
-    left: 10% !important;
-    right: 10% !important;
-    height: 1.5px !important;
-    background: linear-gradient(90deg, transparent, #38bdf8, #818cf8, transparent) !important;
+#kc-form, #kc-info {
+  width: 100% !important;
+  max-width: 100% !important;
+  float: none !important;
+  display: block !important;
 }
 
-/* 🏷️ Masquer les éléments natifs superflus de Keycloak */
+/* ── Carte principale ── */
+.card-pf, #kc-card-wrapper {
+  background: var(--ac-card) !important;
+  border: 1px solid var(--ac-border) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 20px 40px rgba(15, 35, 60, 0.12), 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  padding: 2rem 2.25rem !important;
+  width: 100% !important;
+  max-width: 440px !important;
+  box-sizing: border-box !important;
+  margin: 0 auto !important;
+  position: relative !important;
+  backdrop-filter: blur(16px) !important;
+  /* Liseré teal solide en haut — pas de dégradé */
+  border-top: 3px solid var(--ac-teal) !important;
+}
+
+/* ── Masquer en-tête Keycloak natif ── */
 #kc-header {
-    display: none !important;
+  display: none !important;
 }
 
-/* 🏆 Logo & En-tête de la Clinique */
-#kc-content-wrapper {
-    margin-top: 0 !important;
+/* ── Logo + branding en haut de la carte ── */
+.card-pf::before, #kc-card-wrapper::before {
+  display: none !important;
 }
 
+/* ── Titre de la page (CONNEXION / MOT DE PASSE OUBLIÉ) ── */
 #kc-page-title {
-    font-family: 'Outfit', sans-serif !important;
-    font-size: 1.8rem !important;
-    font-weight: 900 !important;
-    text-transform: uppercase !important;
-    letter-spacing: -0.05em !important;
-    text-align: center !important;
-    margin-bottom: 2.2rem !important;
-    background: linear-gradient(to right, #38bdf8 20%, #818cf8 80%) !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 0.5rem !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 1.25rem !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  text-align: center !important;
+  margin-bottom: 1.25rem !important;
+  /* Couleur ardoise solide — aucun dégradé */
+  color: var(--ac-text) !important;
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  -webkit-text-fill-color: var(--ac-text) !important;
 }
 
+/* ── Retirer l'icône ⚡ de l'ancienne version ── */
 #kc-page-title::before {
-    content: '⚡' !important;
-    font-size: 1.5rem !important;
-    filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.6)) !important;
+  content: '' !important;
 }
 
-/* 📝 Styles des Libellés et Formulaires */
-.form-group {
-    margin-bottom: 1.5rem !important;
-}
-
+/* ── Labels des champs ── */
 label {
-    color: #94a3b8 !important;
-    font-size: 0.75rem !important;
-    font-weight: 700 !important;
-    margin-bottom: 0.5rem !important;
-    display: block !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.08em !important;
+  color: var(--ac-text-muted) !important;
+  font-size: 0.68rem !important;
+  font-weight: 700 !important;
+  margin-bottom: 0.4rem !important;
+  display: block !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.1em !important;
 }
 
-/* ⌨️ Champs de saisie */
-input[type="text"], 
-input[type="password"] {
-    background-color: rgba(15, 23, 42, 0.65) !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: 12px !important;
-    color: #ffffff !important;
-    font-size: 0.95rem !important;
-    padding: 0.85rem 1.1rem !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+/* ── Groupes de champs ── */
+.form-group {
+  margin-bottom: 1rem !important;
 }
 
-input[type="text"]:focus, 
-input[type="password"]:focus {
-    border-color: #38bdf8 !important;
-    outline: none !important;
-    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25),
-                inset 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-    background-color: rgba(15, 23, 42, 0.8) !important;
+/* ── Champs de saisie ── */
+input[type="text"],
+input[type="password"],
+input[type="email"] {
+  background-color: var(--ac-surface) !important;
+  border: 1px solid var(--ac-border) !important;
+  border-radius: 10px !important;
+  color: var(--ac-text) !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  padding: 0.8rem 1rem !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease !important;
 }
 
-/* Options supplémentaires (Se souvenir de moi / Mot de passe oublié) */
+input[type="text"]::placeholder,
+input[type="password"]::placeholder,
+input[type="email"]::placeholder {
+  color: rgba(30, 41, 59, 0.35) !important;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus {
+  border-color: var(--ac-teal) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(26, 127, 151, 0.18) !important;
+  background-color: var(--ac-surface) !important;
+}
+
+/* ── Ligne "Se souvenir de moi / Mot de passe oublié" ── */
 .login-pf-settings {
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-    font-size: 0.8rem !important;
-    margin: 1.5rem 0 !important;
+  display: flex !important;
+  width: 100% !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  font-size: 0.78rem !important;
+  margin: 1rem 0 !important;
 }
 
 .checkbox label {
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 0.4rem !important;
-    cursor: pointer !important;
-    color: #94a3b8 !important;
-    font-weight: 500 !important;
-    text-transform: none !important;
-    letter-spacing: normal !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+  cursor: pointer !important;
+  color: var(--ac-text-muted) !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  font-size: 0.78rem !important;
 }
 
-/* 🔘 Bouton Soumettre Connexion */
+input[type="checkbox"] {
+  accent-color: var(--ac-teal) !important;
+  width: 14px !important;
+  height: 14px !important;
+}
+
+/* ── Bouton principal (CONNEXION / ENVOYER) ── */
 #kc-login {
-    margin-top: 1.8rem !important;
+  margin-top: 1rem !important;
 }
 
-input[type="submit"], 
+input[type="submit"],
 .btn-primary {
-    background: linear-gradient(135deg, #0284c7 0%, #4f46e5 100%) !important;
-    border: none !important;
-    border-radius: 12px !important;
-    color: #ffffff !important;
-    font-family: 'Outfit', sans-serif !important;
-    font-size: 0.95rem !important;
-    font-weight: 700 !important;
-    padding: 0.9rem !important;
-    width: 100% !important;
-    cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    box-shadow: 0 8px 16px rgba(79, 70, 229, 0.25) !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.05em !important;
+  /* Couleur unie teal — aucun dégradé */
+  background-color: var(--ac-teal) !important;
+  border: none !important;
+  border-radius: 10px !important;
+  color: #ffffff !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 0.8rem !important;
+  font-weight: 800 !important;
+  padding: 0.85rem !important;
+  width: 100% !important;
+  cursor: pointer !important;
+  transition: background-color 0.18s ease, transform 0.1s ease !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.1em !important;
+  box-shadow: 0 4px 12px rgba(26, 127, 151, 0.3) !important;
 }
 
-input[type="submit"]:hover, 
+input[type="submit"]:hover,
 .btn-primary:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 12px 24px rgba(79, 70, 229, 0.45) !important;
-    filter: brightness(1.1) !important;
+  background-color: var(--ac-teal-dark) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 8px 20px rgba(26, 127, 151, 0.35) !important;
 }
 
-input[type="submit"]:active, 
+input[type="submit"]:active,
 .btn-primary:active {
-    transform: translateY(1px) !important;
+  transform: translateY(0) !important;
+  background-color: var(--ac-teal-dark) !important;
 }
 
-/* 🔗 Style des liens */
+/* ── Liens (Mot de passe oublié, retour, etc.) ── */
 a {
-    color: #38bdf8 !important;
-    text-decoration: none !important;
-    font-weight: 600 !important;
-    transition: color 0.15s ease !important;
+  color: var(--ac-teal-light) !important;
+  text-decoration: none !important;
+  font-weight: 600 !important;
+  font-size: 0.78rem !important;
+  transition: color 0.15s ease !important;
 }
 
 a:hover {
-    color: #818cf8 !important;
+  color: var(--ac-teal-dark) !important;
 }
 
-/* Section footer (Créer un compte / etc.) */
+/* ── Section info / footer (Créer un compte) ── */
 #kc-info {
-    margin-top: 2rem !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
-    padding-top: 1.5rem !important;
-    text-align: center !important;
-    font-size: 0.8rem !important;
-    color: #64748b !important;
+  margin-top: 1.75rem !important;
+  border-top: 1px solid var(--ac-border) !important;
+  padding-top: 1.25rem !important;
+  text-align: center !important;
+  font-size: 0.75rem !important;
+  color: var(--ac-text-muted) !important;
 }
 
 #kc-registration {
-    font-size: 0.85rem !important;
-    color: #94a3b8 !important;
+  font-size: 0.8rem !important;
+  color: var(--ac-text-muted) !important;
 }
 
-/* Alertes & Erreurs (Feedback visuel) */
+/* ── Alertes et messages d'erreur ── */
 .alert {
-    border-radius: 12px !important;
-    padding: 0.75rem 1rem !important;
-    font-size: 0.8rem !important;
-    font-weight: 500 !important;
-    margin-bottom: 1.5rem !important;
-    border: 1px solid transparent !important;
+  border-radius: 10px !important;
+  padding: 0.7rem 1rem !important;
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  margin-bottom: 1.25rem !important;
+  border: 1px solid transparent !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 0.5rem !important;
 }
 
 .alert-error {
-    background-color: rgba(244, 63, 94, 0.15) !important;
-    border-color: rgba(244, 63, 94, 0.2) !important;
-    color: #fb7185 !important;
+  background-color: var(--ac-red-soft) !important;
+  border-color: rgba(192, 57, 43, 0.25) !important;
+  color: #c0392b !important;
 }
 
 .alert-success {
-    background-color: rgba(16, 185, 129, 0.15) !important;
-    border-color: rgba(16, 185, 129, 0.2) !important;
-    color: #34d399 !important;
+  background-color: var(--ac-green-soft) !important;
+  border-color: rgba(26, 122, 71, 0.25) !important;
+  color: var(--ac-green) !important;
+}
+
+.alert-warning {
+  background-color: rgba(232, 160, 32, 0.1) !important;
+  border-color: rgba(232, 160, 32, 0.2) !important;
+  color: #a06a00 !important;
+}
+
+.alert-info {
+  background-color: rgba(26, 127, 151, 0.1) !important;
+  border-color: rgba(26, 127, 151, 0.2) !important;
+  color: var(--ac-teal-light) !important;
+}
+
+/* ── Icône d'alerte (pficon) ── */
+.pficon {
+  flex-shrink: 0 !important;
+  margin-top: 1px !important;
+}
+
+/* ── Instructions page reset mot de passe ── */
+#kc-page-title + p,
+.instruction {
+  color: var(--ac-text-muted) !important;
+  font-size: 0.8rem !important;
+  text-align: center !important;
+  margin-bottom: 1.5rem !important;
+  line-height: 1.6 !important;
+}
+
+/* ── Lien "Retour à la connexion" (page forgot password) ── */
+#kc-info-message {
+  text-align: center !important;
+  margin-top: 1.5rem !important;
+  color: var(--ac-text-muted) !important;
+  font-size: 0.78rem !important;
+}
+
+/* ── Conteneur du wrapper card ── */
+#kc-content {
+  width: 100% !important;
+}
+
+#kc-content-wrapper {
+  margin-top: 0 !important;
+}
+
+/* ── Bouton secondaire (Retour, Annuler) ── */
+.btn-default,
+input[type="button"] {
+  background-color: transparent !important;
+  border: 1px solid var(--ac-border) !important;
+  border-radius: 10px !important;
+  color: var(--ac-text-muted) !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 0.8rem !important;
+  font-weight: 700 !important;
+  padding: 0.8rem !important;
+  width: 100% !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  margin-top: 0.75rem !important;
+}
+
+.btn-default:hover,
+input[type="button"]:hover {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+  color: var(--ac-text) !important;
+  border-color: rgba(26, 127, 151, 0.3) !important;
+}
+
+/* ── Responsive mobile ── */
+@media (max-width: 480px) {
+  #kc-card-wrapper {
+    border-radius: 16px !important;
+    padding: 2rem 1.5rem !important;
+  }
 }

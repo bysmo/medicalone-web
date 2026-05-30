@@ -25,6 +25,8 @@ public class PatientResponse {
     private String phone3;
     private String email;
     private String address;
+    private String profession;
+    private String fonction;
     
     private String insurer;
     private String subscriber;

@@ -97,12 +97,18 @@ public class InvoiceController {
     public ResponseEntity<?> createInvoice(@RequestBody Map<String, Object> body) {
         UUID clinicId = clinicContextHolder.getClinicId();
 
+        UUID prescribingDoctorId = null;
+        if (body.get("prescribingDoctorId") != null) {
+            try { prescribingDoctorId = UUID.fromString((String) body.get("prescribingDoctorId")); } catch (Exception ignored) {}
+        }
+
         Invoice invoice = Invoice.builder()
                 .clinicId(clinicId)
                 .patientId(UUID.fromString((String) body.get("patientId")))
                 .tariffType(parseTariffType((String) body.get("tariffType")))
                 .coverageRate(body.get("coverageRate") != null ? (Integer) body.get("coverageRate") : 0)
                 .bordereauCode((String) body.get("bordereauCode"))
+                .prescribingDoctorId(prescribingDoctorId)
                 .status(parseInvoiceStatus((String) body.get("status")))
                 .build();
 

@@ -140,6 +140,17 @@ export const insuranceService = {
   delete: (id) => api.delete(`/api/v1/insurances/${id}`),
 };
 
+export const externalPrescribingDoctorService = {
+  getAll: () => api.get('/api/v1/external-prescribing-doctors'),
+  create: (data) => api.post('/api/v1/external-prescribing-doctors', data),
+};
+
+export const discountRequestService = {
+  create: (data) => api.post('/api/v1/invoices/discount-requests', data),
+  getPending: () => api.get('/api/v1/invoices/discount-requests/pending'),
+  validate: (id, data) => api.post(`/api/v1/invoices/discount-requests/${id}/validate`, data),
+};
+
 export const cashSessionService = {
   getActive: () => api.get('/api/v1/cash-sessions/active'),
   open: (data) => api.post('/api/v1/cash-sessions/open', data),
@@ -223,6 +234,12 @@ export const medicalService = {
   getDicomFilesByConsultation: (consultationId) => api.get(`/api/v1/medical/dicom/consultation/${consultationId}`),
   getDicomFilesByPatient: (patientId) => api.get(`/api/v1/medical/dicom/patient/${patientId}`),
   deleteDicom: (id) => api.delete(`/api/v1/medical/dicom/${id}`),
+  // --- Validation de séance (crée et finalise directement) ---
+  validateSeance: (data) => api.post('/api/v1/medical/validate-seance', data),
+
+  // --- Données médicales de base du patient ---
+  getMedicalBackground: (patientId) => api.get(`/api/v1/medical/patients/${patientId}/background`),
+  saveMedicalBackground: (patientId, data) => api.put(`/api/v1/medical/patients/${patientId}/background`, data),
 };
 
 export const staffRemunerationService = {
