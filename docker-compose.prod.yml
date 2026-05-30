@@ -1,0 +1,353 @@
+# ================================================================
+# AlphaCureClinic — Docker Compose PRODUCTION VPS
+# Usage : docker compose -f docker-compose.prod.yml up -d
+# ================================================================
+
+services:
+  # --- Base de données ---
+  mysql:
+    image: mysql:8.0
+    container_name: alphacure-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: alphacure_db
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - alphacure-network
+    # Ne pas exposer MySQL sur l'hôte en production
+    # ports: ["3307:3306"]
+
+  # --- Sécurité (Keycloak) ---
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: alphacure-keycloak
+    restart: unless-stopped
+    # Mode production : start (sans -dev)
+    command: start --import-realm --http-port=8180
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_HTTP_PORT: 8180
+      KC_HOSTNAME: ${KC_HOSTNAME}
+      KC_HOSTNAME_STRICT: ${KC_HOSTNAME_STRICT:-false}
+      KC_PROXY: ${KC_PROXY:-edge}
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+    volumes:
+      - ./keycloak/realms:/opt/keycloak/data/import
+      - ./keycloak/themes:/opt/keycloak/themes
+    networks:
+      - alphacure-network
+
+  # --- Infrastructure ---
+  discovery-service:
+    build:
+      context: ./discovery-service
+      dockerfile: Dockerfile
+    container_name: alphacure-discovery
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    networks:
+      - alphacure-network
+
+  config-service:
+    build:
+      context: ./config-service
+      dockerfile: Dockerfile
+    container_name: alphacure-config
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker,native
+    networks:
+      - alphacure-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    depends_on:
+      - discovery-service
+
+  # --- Messagerie ---
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: alphacure-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+    networks:
+      - alphacure-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: alphacure-kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: alphacure-zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://alphacure-kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - alphacure-network
+
+  # --- API Gateway ---
+  gateway-service:
+    build:
+      context: ./gateway-service
+      dockerfile: Dockerfile
+    container_name: gateway-service
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
+    depends_on:
+      config-service:
+        condition: service_healthy
+    networks:
+      - alphacure-network
+
+  # --- Microservices ---
+  patient-service:
+    build: ./patient-service
+    container_name: alphacure-patient
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
+      - DB_PASSWORD=${DB_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+    networks:
+      - alphacure-network
+
+  billing-service:
+    build: ./billing-service
+    container_name: alphacure-billing
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
+      - DB_PASSWORD=${DB_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+    networks:
+      - alphacure-network
+
+  identity-service:
+    build: ./identity-service
+    container_name: alphacure-identity
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
+      - KEYCLOAK_AUTH_SERVER_URL=http://alphacure-keycloak:8180
+      - KEYCLOAK_REALM=alphacure
+      - KEYCLOAK_CLIENT_ID=alphacure-app
+      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-}
+      - SPRING_AUTOCONFIGURE_EXCLUDE=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+    depends_on:
+      keycloak:
+        condition: service_started
+      config-service:
+        condition: service_healthy
+    networks:
+      - alphacure-network
+
+  clinic-service:
+    build: ./clinic-service
+    container_name: alphacure-clinic
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
+      - DB_PASSWORD=${DB_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+    networks:
+      - alphacure-network
+
+  nomenclature-service:
+    build: ./nomenclature-service
+    container_name: alphacure-nomenclature
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
+      - DB_PASSWORD=${DB_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+    networks:
+      - alphacure-network
+
+  medical-record-service:
+    build: ./medical-record-service
+    container_name: alphacure-medical-record
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
+      - DB_PASSWORD=${DB_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+    networks:
+      - alphacure-network
+
+  session-service:
+    build: ./session-service
+    container_name: alphacure-session
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
+      - DB_PASSWORD=${DB_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+    networks:
+      - alphacure-network
+
+  staff-service:
+    build: ./staff-service
+    container_name: alphacure-staff
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
+      - DB_PASSWORD=${DB_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+    networks:
+      - alphacure-network
+
+  payment-service:
+    build: ./payment-service
+    container_name: alphacure-payment
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
+      - DB_PASSWORD=${DB_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+    networks:
+      - alphacure-network
+
+  # --- UI (avec injection des URLs de production au build time) ---
+  alphacure-ui:
+    build:
+      context: ./alphacure-ui
+      dockerfile: Dockerfile
+      args:
+        VITE_GATEWAY_URL: ${PUBLIC_GATEWAY_URL}
+        VITE_KEYCLOAK_URL: ${PUBLIC_KEYCLOAK_URL}
+    container_name: alphacure-ui
+    restart: unless-stopped
+    networks:
+      - alphacure-network
+
+  alphacure-admin:
+    build:
+      context: ./alphacure-admin
+      dockerfile: Dockerfile
+      args:
+        VITE_GATEWAY_URL: ${PUBLIC_GATEWAY_URL}
+        VITE_KEYCLOAK_URL: ${PUBLIC_KEYCLOAK_URL}
+    container_name: alphacure-admin
+    restart: unless-stopped
+    networks:
+      - alphacure-network
+
+  # --- Reverse Proxy (Nginx = point d'entrée unique) ---
+  nginx-proxy:
+    image: nginx:alpine
+    container_name: alphacure-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot_www:/var/www/certbot:ro
+      - certbot_certs:/etc/letsencrypt:ro
+    depends_on:
+      - alphacure-ui
+      - alphacure-admin
+      - gateway-service
+      - keycloak
+    networks:
+      - alphacure-network
+
+  # --- SSL Automatique (Let's Encrypt) ---
+  certbot:
+    image: certbot/certbot
+    container_name: alphacure-certbot
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_certs:/etc/letsencrypt
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    networks:
+      - alphacure-network
+
+volumes:
+  mysql_data:
+  zookeeper_data:
+  kafka_data:
+  certbot_www:
+  certbot_certs:
+
+networks:
+  alphacure-network:
+    driver: bridge
