@@ -166,8 +166,8 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
-      - DB_USERNAME=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_USERNAME=root
+      - DB_PASSWORD=${DB_ROOT_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
@@ -188,8 +188,8 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
-      - DB_USERNAME=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_USERNAME=root
+      - DB_PASSWORD=${DB_ROOT_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
@@ -235,8 +235,8 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
-      - DB_USERNAME=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_USERNAME=root
+      - DB_PASSWORD=${DB_ROOT_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
@@ -257,8 +257,8 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
-      - DB_USERNAME=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_USERNAME=root
+      - DB_PASSWORD=${DB_ROOT_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
@@ -279,8 +279,8 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
-      - DB_USERNAME=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_USERNAME=root
+      - DB_PASSWORD=${DB_ROOT_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
@@ -301,8 +301,8 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
-      - DB_USERNAME=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_USERNAME=root
+      - DB_PASSWORD=${DB_ROOT_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
@@ -323,8 +323,8 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
-      - DB_USERNAME=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_USERNAME=root
+      - DB_PASSWORD=${DB_ROOT_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
@@ -345,8 +345,8 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
-      - DB_USERNAME=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_USERNAME=root
+      - DB_PASSWORD=${DB_ROOT_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
@@ -367,8 +367,8 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_CLOUD_CONFIG_URI=http://alphacure-config:8888
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
-      - DB_USERNAME=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_USERNAME=root
+      - DB_PASSWORD=${DB_ROOT_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
