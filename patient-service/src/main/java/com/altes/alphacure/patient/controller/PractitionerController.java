@@ -262,12 +262,10 @@ public class PractitionerController {
                         .accessLevel(0)
                         .build()
             );
+            int idx = 1;
+            int currentYear = java.time.LocalDate.now().getYear();
             for (Practitioner p : fictionalStaff) {
-                try {
-                    p.setMatricule(clinicClient.getNextNumber(NumberingDocumentType.STAFF_MATRICULE, clinicId));
-                } catch (Exception e) {
-                    // ignore
-                }
+                p.setMatricule(String.format("MAT-%d-%04d", currentYear, idx++));
             }
             practitionerRepository.saveAll(fictionalStaff);
         }
