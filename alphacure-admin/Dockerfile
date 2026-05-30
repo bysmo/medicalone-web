@@ -1,15 +1,18 @@
-# Build stage
-FROM node:20-alpine as build
+# Build stage — Accept env vars at build time for Vite
+FROM node:20-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm install --legacy-peer-deps
 COPY . .
+ARG VITE_GATEWAY_URL=http://localhost:8080
+ARG VITE_KEYCLOAK_URL=http://localhost:8180
+ENV VITE_GATEWAY_URL=$VITE_GATEWAY_URL
+ENV VITE_KEYCLOAK_URL=$VITE_KEYCLOAK_URL
 RUN npm run build
 
 # Production stage
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
-# Configuration Nginx pour le SPA (Single Page Application)
 RUN echo "server { \
     listen 80; \
     location / { \
