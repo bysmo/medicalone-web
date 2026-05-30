@@ -237,6 +237,8 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
       - DB_USERNAME=root
       - DB_PASSWORD=${DB_ROOT_PASSWORD}
+      - KEYCLOAK_ADMIN_USERNAME=${KEYCLOAK_ADMIN_USER}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
@@ -325,6 +327,8 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://alphacure-discovery:8761/eureka/
       - DB_USERNAME=root
       - DB_PASSWORD=${DB_ROOT_PASSWORD}
+      - KEYCLOAK_ADMIN_USERNAME=${KEYCLOAK_ADMIN_USER}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
